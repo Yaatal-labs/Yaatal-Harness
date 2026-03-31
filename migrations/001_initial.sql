@@ -3,6 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS profiles (
     id TEXT PRIMARY KEY,
+    user_id INTEGER,
     username TEXT UNIQUE,
     display_name TEXT,
     bio TEXT,

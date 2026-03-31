@@ -5,6 +5,10 @@ edition.workspace = true
 license.workspace = true
 description = "ColBERT search and retrieval for Yaatal Engine (future)"
 
+[lints]
+workspace = true
+
 [dependencies]
-yaatal-core = { path = "../yaatal-core" }
 serde.workspace = true
+serde_json.workspace = true
+reqwest = { workspace = true, features = ["blocking"] }

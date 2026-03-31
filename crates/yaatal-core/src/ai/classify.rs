@@ -44,6 +44,7 @@ pub fn classify_task(text: &str) -> (AiTask, &'static str) {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -85,7 +86,13 @@ mod tests {
 
     #[test]
     fn test_task_timeouts() {
-        assert_eq!(AiTask::Retrieval.timeout(), std::time::Duration::from_millis(1500));
-        assert_eq!(AiTask::Create.timeout(), std::time::Duration::from_millis(3000));
+        assert_eq!(
+            AiTask::Retrieval.timeout(),
+            std::time::Duration::from_millis(1500)
+        );
+        assert_eq!(
+            AiTask::Create.timeout(),
+            std::time::Duration::from_millis(3000)
+        );
     }
 }

@@ -27,21 +27,26 @@ pub const ADINKRA_FIHANKRA: &str = "\u{25C8}";
 pub const ADINKRA_MPATAPO: &str = "\u{26AF}";
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    const _: () = assert!(TOUCH_TARGET_MIN >= 44);
 
     #[test]
     fn test_colors_are_valid_hex() {
-        let colors = [TERRACOTTA_PRIMARY, INDIGO_DEEP, SAVANNA_GOLD,
-            FOREST_GREEN, SAND_NEUTRAL, CHARCOAL_BASE, CLAY_WHITE, RUST_ACCENT];
+        let colors = [
+            TERRACOTTA_PRIMARY,
+            INDIGO_DEEP,
+            SAVANNA_GOLD,
+            FOREST_GREEN,
+            SAND_NEUTRAL,
+            CHARCOAL_BASE,
+            CLAY_WHITE,
+            RUST_ACCENT,
+        ];
         for color in colors {
             assert!(color.starts_with('#'), "Color {} must start with #", color);
             assert_eq!(color.len(), 7, "Color {} must be 7 chars (#RRGGBB)", color);
         }
-    }
-
-    #[test]
-    fn test_touch_target_minimum() {
-        assert!(TOUCH_TARGET_MIN >= 44);
     }
 }
