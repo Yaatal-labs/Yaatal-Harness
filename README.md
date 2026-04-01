@@ -51,12 +51,25 @@ cp .env.example .env
 # Fill in your API keys
 ```
 
+## Railway
+
+`Yaatal-Engine` deploys the `yaatal-api` binary on Railway. For a fresh service or a drifted one, use:
+
+```powershell
+.\scripts\railway-bootstrap.ps1
+.\scripts\railway-bootstrap.ps1 -Apply
+```
+
+The bootstrap script verifies the sibling Postgres service, ensures the required runtime variables exist, and triggers a single redeploy. Full notes live in [`docs/deployment/railway.md`](docs/deployment/railway.md).
+
 ## Configuration
 
-Config files are in `config/`:
-- `development.yaml` — local dev (SQLite file, disk storage)
-- `test.yaml` — tests (in-memory DB)
-- `production.yaml` — deployed (Turso, S3, real keys)
+This repo has two config trees:
+
+- `crates/yaatal-api/config/` — Loco runtime config for the deployed API
+- `config/` — engine-level workspace config from the initial scaffold
+
+Railway boots `yaatal-api` from `crates/yaatal-api/config/`, not the root `config/` folder.
 
 ## License
 

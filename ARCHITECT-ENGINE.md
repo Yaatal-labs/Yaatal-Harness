@@ -112,6 +112,18 @@ App-specific code goes in `apps/` ONLY.
 **What's next:** E2 — Database schema + models (SeaORM migrations, Turso connection pool)
 **Blockers:** gh CLI still not authenticated — PR needs manual push or auth
 
+### Session 003 — 2026-04-01 (Railway Deploy Hardening)
+**Architect:** Codex
+**What happened:**
+- Fixed Railway packaging for `yaatal-api` so Railpack installs the binary into `/app/bin`
+- Hardened the API binary to auto-select `crates/yaatal-api/config` when launched from the workspace root
+- Added `scripts/railway-bootstrap.ps1` to verify the Postgres service, wire `DATABASE_URL`, generate `JWT_SECRET`, and redeploy once
+- Improved `scripts/setup-rust-test-env.ps1` to add Git `cp.exe` and import MSVC build tools automatically on Windows when present
+- Updated `README.md`, `.env.example`, and `docs/deployment/railway.md` to document the deploy path and dual-config layout
+- Verified Railway service `Yaatal-Engine` reached healthy `SUCCESS` status in production
+**What's next:** Merge the deploy hardening branch and keep Railway bootstrap in repo as the default recovery path
+**Blockers:** None
+
 ---
 
 ## END SESSION PROTOCOL
