@@ -105,15 +105,23 @@ async fn feed_requires_auth() {
 #[serial]
 async fn feed_returns_ranked_posts() {
     request::<App, _, _>(|request, ctx| async move {
-        // Setup: register user and create posts from different authors
-        let (user, token) =
+        // Setup: register the feed viewer and a separate author whose posts should appear
+        let (viewer, token) =
             register_and_login(&request, &ctx, "feed_tester", "feed@test.com", "12341234").await;
-        let profile = linked_profile_by_user_pid(&ctx, &user.pid.to_string()).await;
+        let (author_user, _author_token) = register_and_login(
+            &request,
+            &ctx,
+            "feed_author",
+            "feed-author@test.com",
+            "12341234",
+        )
+        .await;
+        let author_profile = linked_profile_by_user_pid(&ctx, &author_user.pid.to_string()).await;
 
         // Seed posts with varying engagement (to test ranking)
         let _post1 = seed_post(
             &ctx,
-            &profile.id,
+            &author_profile.id,
             "Low engagement",
             "Content 1",
             "discussion",
@@ -122,7 +130,7 @@ async fn feed_returns_ranked_posts() {
         .await;
         let post2 = seed_post(
             &ctx,
-            &profile.id,
+            &author_profile.id,
             "Medium engagement",
             "Content 2",
             "discussion",
@@ -131,7 +139,7 @@ async fn feed_returns_ranked_posts() {
         .await;
         let post3 = seed_post(
             &ctx,
-            &profile.id,
+            &author_profile.id,
             "High engagement",
             "Content 3",
             "discussion",
