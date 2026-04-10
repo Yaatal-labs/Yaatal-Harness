@@ -1,7 +1,8 @@
-// yaatal-feed/src/pipeline/traits.rs
-//
-// Adapted from xai-org/x-algorithm candidate-pipeline (Apache-2.0)
-// Simplified for YOKK's scale while keeping the composable pipeline shape.
+//! Core pipeline traits adapted from xai-org/x-algorithm (Apache-2.0).
+//!
+//! The traits are generic enough to support both ranking candidates and
+//! ingestion support records while keeping the default pipeline social-feed
+//! focused.
 
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -11,8 +12,8 @@ const DEFAULT_STAGE_TIMEOUT: Duration = Duration::from_secs(5);
 const DEFAULT_SIDE_EFFECT_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Trait for items with a unique string identifier.
-/// Implemented by `FeedCandidate` and `RawArticle` to enable
-/// generic deduplication and tracking across the pipeline.
+/// Implemented by ranking candidates and ingestion support records to enable
+/// generic deduplication and tracking across pipeline stages.
 pub trait Identifiable {
     /// Returns the unique identifier for this item.
     fn id(&self) -> &str;

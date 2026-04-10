@@ -1,12 +1,7 @@
-// yaatal-feed/src/builder.rs
-//
-// YOKK's equivalent of x-algorithm home-mixer/candidate_pipeline/phoenix_candidate_pipeline.rs.
-// Wires all components together: sources → filters → scorers → selector.
-//
-// Usage:
-//   let pipeline = YokkFeedPipeline::build(post_repo, discovery_repo);
-//   let result = pipeline.execute(query, "req-123").await;
-//   // result.candidates is your ranked feed
+//! Default social timeline builder.
+//!
+//! Wires the crate's default source, filter, scorer, and selector stack into a
+//! ready-to-run ranking pipeline.
 
 use crate::filters::age_filter::AgeFilter;
 use crate::filters::blocked_authors_filter::BlockedAuthorsFilter;
@@ -28,11 +23,7 @@ use std::sync::Arc;
 pub struct FeedBuilder;
 
 impl FeedBuilder {
-    /// Build the complete feed pipeline.
-    ///
-    /// X's PhoenixCandidatePipeline requires ~10 client dependencies.
-    /// YOKK needs 2: a post repository and a discovery repository.
-    /// Both backed by Turso — same DB, different query patterns.
+    /// Builds the crate's default social timeline pipeline.
     pub fn build(
         post_repo: Arc<dyn PostRepository>,
         discovery_repo: Arc<dyn DiscoveryRepository>,
@@ -55,14 +46,11 @@ impl FeedBuilder {
 
         // Scorers (run sequentially — order matters)
         //
-        // X's chain: Phoenix ML → Weighted → AuthorDiversity → OON
-        // YOKK Day 1: Recency → Weighted → AuthorDiversity
-        // YOKK Day N: Replace Recency with Bo AI ML scorer
-        // Scorers (run sequentially — order matters)
+        // Default scorer chain: recency baseline → weighted combination → diversity.
         let scorers: Vec<Box<dyn Scorer<FeedQuery, FeedCandidate>>> = vec![
-            Box::new(RecencyScorer::default()), // baseline engagement prediction
-            Box::new(WeightedScorer::new(config)), // combine predictions into score
-            Box::new(AuthorDiversityScorer::new(config)), // prevent feed domination
+            Box::new(RecencyScorer::default()),
+            Box::new(WeightedScorer::new(config)),
+            Box::new(AuthorDiversityScorer::new(config)),
         ];
 
         // Selector

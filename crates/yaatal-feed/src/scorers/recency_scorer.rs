@@ -1,9 +1,7 @@
-// yaatal-feed/src/scorers/recency_scorer.rs
-//
-// No equivalent in X — they rely entirely on the Grok transformer.
-// YOKK needs this as the Day 1 scorer before ML engagement predictions exist.
-// Simple exponential time decay: newer posts score higher.
-// Replace with ML scorer (Bo AI predictions) when the model is trained.
+//! Recency baseline scorer.
+//!
+//! This scorer provides a simple exponential time-decay prior until a caller
+//! replaces or augments it with a richer ML-driven prior.
 
 use crate::pipeline::traits::*;
 use crate::types::*;

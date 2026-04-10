@@ -1,4 +1,4 @@
-//! Feed controller — ranked feed pipeline for user timeline.
+//! Feed controller — ranked feed pipeline for the authenticated user's timeline.
 //!
 //! Combines following source (posts from followed accounts) with
 //! discovery source (trending/recommended posts) using yaatal-feed pipeline.
@@ -87,8 +87,8 @@ async fn get_feed(
     let mut query = FeedQuery::new(&profile.id, &country, (per_page * page) as usize);
     query.in_network_only = in_network_only;
 
-    // TODO: Hydrate query with user's following/blocked/muted lists
-    // For now, empty lists mean no filtering
+    // TODO: The API layer owns relationship hydration and should pass those
+    // lists into the generic feed query before execution.
     query.following_ids = vec![];
     query.blocked_ids = vec![];
     query.muted_ids = vec![];

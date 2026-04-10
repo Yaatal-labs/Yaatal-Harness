@@ -1,11 +1,11 @@
-// yaatal-feed/src/weights.rs
-//
-// Generic runtime configuration for feed ranking weights.
-// Different apps in the Yaatal Engine ecosystem can provide their own WeightConfig.
+//! Runtime configuration for feed ranking weights.
+//!
+//! These defaults describe a generic social timeline. Ingestion-related budgets
+//! live in `types::IngestionConfig`.
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct WeightConfig {
     // ─── Positive Weights ──────────────────────────────────────────────
     pub listen_weight: f64,
@@ -34,7 +34,7 @@ pub struct WeightConfig {
     pub voice_post_boost: f64,
     pub voice_min_duration_ms: u32,
 
-    pub commerce_listing_boost: f64, // App-specific content boost
+    pub commerce_listing_boost: f64,
 
     // ─── Diversity ─────────────────────────────────────────────────────
     pub author_diversity_decay: f64,
@@ -48,21 +48,17 @@ pub struct WeightConfig {
     // ─── Pipeline ──────────────────────────────────────────────────────
     pub max_post_age_hours: u64,
     pub default_result_size: usize,
-    /// Max articles to keep per source category during ingestion.
-    pub ingestion_keep_per_category: usize,
-    /// Max AI enrichments (summaries, translations) per ingestion cycle.
-    pub max_enrichments_per_cycle: usize,
 }
 
 impl Default for WeightConfig {
     fn default() -> Self {
-        Self::yokk_defaults()
+        Self::social_defaults()
     }
 }
 
 impl WeightConfig {
-    /// Initial weights for YOKK (Voice-first African social platform)
-    pub fn yokk_defaults() -> Self {
+    /// Baseline weights for a generic social feed.
+    pub fn social_defaults() -> Self {
         Self {
             listen_weight: 1.0,
             listen_full_weight: 2.0,
@@ -73,8 +69,8 @@ impl WeightConfig {
             profile_click_weight: 2.0,
             follow_weight: 8.0,
 
-            add_to_cart_weight: 0.0, // unused in YOKK
-            purchase_weight: 0.0,    // unused in YOKK
+            add_to_cart_weight: 0.0,
+            purchase_weight: 0.0,
 
             skip_weight: -0.5,
             mute_weight: -74.0,
@@ -97,19 +93,27 @@ impl WeightConfig {
 
             max_post_age_hours: 72,
             default_result_size: 25,
-            ingestion_keep_per_category: 50,
-            max_enrichments_per_cycle: 25,
         }
     }
 
-    /// Initial weights for NJOOBA (Commerce platform)
-    pub fn njooba_defaults() -> Self {
-        let mut config = Self::yokk_defaults();
+    /// Baseline weights for a listing-heavy or commerce-heavy feed.
+    pub fn commerce_defaults() -> Self {
+        let mut config = Self::social_defaults();
         config.add_to_cart_weight = 10.0;
         config.purchase_weight = 25.0;
         config.commerce_listing_boost = 1.2;
-        config.voice_post_boost = 1.0; // Less emphasis on voice pure content
+        config.voice_post_boost = 1.0;
         config
+    }
+
+    /// Temporary compatibility wrapper for older app-specific call sites.
+    pub fn yokk_defaults() -> Self {
+        Self::social_defaults()
+    }
+
+    /// Temporary compatibility wrapper for older app-specific call sites.
+    pub fn njooba_defaults() -> Self {
+        Self::commerce_defaults()
     }
 
     /// Sum of all positive weights — used for score normalization.

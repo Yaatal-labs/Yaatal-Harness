@@ -1,13 +1,14 @@
-// yaatal-feed — YOKK's feed ranking pipeline
-//
-// Architecture adapted from xai-org/x-algorithm (Apache-2.0).
-// Same composable pipeline pattern, voice-first scoring weights.
-//
-// Quick start:
-//   let pipeline = YokkFeedPipeline::build(post_repo, discovery_repo);
-//   let query = YokkFeedQuery::new("user-123", "SN", 25);
-//   let result = pipeline.execute(query, "req-abc").await;
-//   // result.candidates → ranked Vec<VoicePostCandidate>
+//! yaatal-feed — reusable feed ranking pipeline primitives.
+//!
+//! Architecture adapted from xai-org/x-algorithm (Apache-2.0).
+//! This crate provides a default social timeline composition plus generic
+//! ranking, filtering, and selection building blocks.
+//!
+//! Quick start:
+//!   let pipeline = FeedBuilder::build(post_repo, discovery_repo, WeightConfig::default());
+//!   let query = FeedQuery::new("user-123", "SN", 25);
+//!   let result = pipeline.execute(query, "req-abc").await;
+//!   // result.candidates -> ranked feed candidates
 
 pub mod builder;
 pub mod filters;

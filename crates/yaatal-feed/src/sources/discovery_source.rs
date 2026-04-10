@@ -1,18 +1,14 @@
-// yaatal-feed/src/sources/discovery_source.rs
-//
-// X's Phoenix Retrieval: two-tower embedding model, ANN similarity search across global corpus.
-// YOKK's DiscoverySource: ColBERT retrieval (yaatal-search) or Bo AI recommendations.
-// Same role — "find relevant posts from accounts this user doesn't follow."
-//
-// Day 1: returns trending/popular posts (no ML yet).
-// Day N: plugs into yaatal-search ColBERT or Bo AI embeddings.
+//! Out-of-network discovery source.
+//!
+//! Starts with trending or popular retrieval and can later be backed by richer
+//! recommendation systems without changing the ranking pipeline contract.
 
 use crate::pipeline::traits::*;
 use crate::types::*;
 use async_trait::async_trait;
 use std::sync::Arc;
 
-/// Trait for discovery/retrieval backend. Start with popular posts, evolve to embeddings.
+/// Trait for the discovery backend.
 #[async_trait]
 pub trait DiscoveryRepository: Send + Sync {
     async fn get_discovery_candidates(

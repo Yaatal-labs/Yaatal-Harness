@@ -1,15 +1,11 @@
-// yaatal-feed/src/sources/following_source.rs
-//
-// X's Thunder: in-memory post store, Kafka ingestion, sub-ms lookups.
-// YOKK's FollowingSource: Turso DB query, edge replicas, <10ms lookups.
-// Same role — "give me recent posts from accounts this user follows."
+//! In-network source for recent posts from followed accounts.
 
 use crate::pipeline::traits::*;
 use crate::types::*;
 use async_trait::async_trait;
 use std::sync::Arc;
 
-/// Trait for the actual DB client — implement with Turso/libSQL.
+/// Trait for the backing repository implementation.
 #[async_trait]
 pub trait PostRepository: Send + Sync {
     async fn get_posts_by_authors(

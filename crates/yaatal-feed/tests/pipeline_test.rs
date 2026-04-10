@@ -1,7 +1,5 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::print_stdout)]
-// yaatal-feed/tests/pipeline_test.rs
-//
-// End-to-end test: mock repos → pipeline → ranked feed output.
+// End-to-end test: mock repos -> pipeline -> ranked feed output.
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -24,7 +22,7 @@ impl PostRepository for MockPostRepo {
         _limit: usize,
         _max_age_hours: u64,
     ) -> Result<Vec<FeedCandidate>, String> {
-        // Simulate 3 voice posts from followed accounts
+        // Simulate 3 voice posts from followed accounts.
         let mut posts = Vec::new();
         for (i, author) in author_ids.iter().take(3).enumerate() {
             posts.push(FeedCandidate {
@@ -53,7 +51,7 @@ impl DiscoveryRepository for MockDiscoveryRepo {
         _exclude_author_ids: &[String],
         _limit: usize,
     ) -> Result<Vec<FeedCandidate>, String> {
-        // Simulate 2 discovery voice posts from strangers
+        // Simulate 2 discovery posts from outside the user's network.
         Ok(vec![
             FeedCandidate {
                 id: "post-discover-0".into(),
@@ -69,7 +67,7 @@ impl DiscoveryRepository for MockDiscoveryRepo {
                 id: "post-discover-1".into(),
                 author_id: "stranger-2".into(),
                 created_at: Some(Utc::now() - chrono::Duration::hours(6)),
-                content_type: ContentType::Text, // text-only — should score lower
+                content_type: ContentType::Text,
                 language: Some("en".into()),
                 text: Some("Text-only post, no voice".into()),
                 ..Default::default()
@@ -152,7 +150,7 @@ async fn test_full_pipeline() {
         );
     }
 
-    println!("--- YOKK Feed Pipeline Test Results ---");
+    println!("--- Feed Pipeline Test Results ---");
     println!("Sourced: {}", result.stats.sourced);
     println!("After filter: {}", result.stats.after_filter);
     println!("Selected: {}", result.stats.selected);
@@ -210,7 +208,7 @@ async fn test_filters_remove_blocked_and_self() {
 
 #[tokio::test]
 async fn test_author_diversity() {
-    // Create a repo that returns multiple posts from the same author
+    // Create a repo that returns multiple posts from the same author.
     struct SameAuthorRepo;
 
     #[async_trait]
