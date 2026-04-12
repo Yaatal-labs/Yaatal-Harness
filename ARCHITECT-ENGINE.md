@@ -31,24 +31,23 @@ App-specific code goes in `apps/` ONLY.
 ## PROJECT
 
 **Yaatal Engine** is a Rust workspace providing:
-- AI cascade routing (5-tier, cheapest-first)
-- Database abstraction (Turso/libSQL + SeaORM)
-- Voice recording + transcription
-- Gamification (XP, levels, streaks)
-- Content sanitization
-- Design tokens
-- Semantic search (future)
+- authenticated backend/session orchestration
+- reusable feed/discovery ranking
+- shared domain/database primitives
+- voice transport plus batch transcription fallback
+- external service brokering for PersonaPlex and search
+- gamification, sanitization, and app-agnostic engine support
 
 ### Stack
 
 | Layer | Tech | Crate |
 |-------|------|-------|
-| DB | Turso/libSQL + SeaORM | yaatal-core |
-| Backend | Loco (Rust on Rails) | yaatal-api |
-| AI | reqwest -> SiliconFlow/Qwen/Claude/HF | yaatal-core |
-| Voice | cpal + hound + Whisper | yaatal-voice |
-| Search | ColBERT GGUF (future) | yaatal-search |
-| Mobile | Dioxus 0.7 | yokk-mobile |
+| Data | Postgres + SeaORM today; libSQL/Turso remains longer-term engine direction | yaatal-core + yaatal-api |
+| Backend | Loco on Axum, REST today and WebSocket next | yaatal-api |
+| Feed / Discovery | Generic ranking pipeline | yaatal-feed |
+| Voice | Audio utilities and batch transcription fallback; PersonaPlex transport next | yaatal-voice |
+| Retrieval | External `/search` contract; `yaatal-search` stays evaluation/client-side support for now | yaatal-search |
+| UI | Thin client probe; current `yokk-mobile` is not the active engineering focus | apps/* |
 
 ---
 
@@ -80,9 +79,32 @@ App-specific code goes in `apps/` ONLY.
 ## CURRENT PROJECT STAGE
 
 - Roadmap position: `E1-E5` are materially implemented, `E6` is still active, `E7-E8` remain open.
-- Operating mode: the project has moved from scaffold/buildout into integration, correctness, deployment, and app/runtime completion.
+- Operating mode: the project has moved from scaffold/buildout into integration, correctness, deployment, and service orchestration.
 - Backend status: the service/backend path is real enough to verify and deploy in isolation.
-- Remaining risk concentration: feed behavior contracts, deployment/runtime wiring, voice completion, and app-side integration.
+- Current target: stand up the first Bo-Plex vocal loop with a local mock PersonaPlex upstream and a real `/search` service.
+- Remaining risk concentration: WebSocket session substrate, voice transport adapter, search injection, deployment/runtime wiring, and app-side probe integration.
+
+---
+
+## CURRENT BO-PLEX DIRECTION
+
+- Engine is the orchestrator. `yaatal-api` owns session lifecycle, auth, routing, and retries.
+- PersonaPlex stays external. Start with a local mock, then swap to RunPod.
+- Search stays behind one HTTP boundary. The Engine calls `/search`; BGE-M3 and Qdrant stay behind that service.
+- Client contracts stay thin: JSON envelopes plus base64 audio over WebSocket.
+- Grounding returns upstream as text context injection.
+- Redis, SigLIP2, ZeroClaw, Path B orchestration, and heavy app work are out of the first milestone.
+
+---
+
+## ACTIVE EXECUTION LANES
+
+| Lane | Branch / worktree | Scope |
+|------|--------------------|-------|
+| Control / integration | `codex/deploy-candidate` | canonical branch for deployable backend and docs |
+| Bo-Plex session API | `codex/boplex-session-api` | `yaatal-api` WebSocket route, JWT auth, in-memory session state |
+| PersonaPlex adapter | `codex/boplex-personaplex-adapter` | `yaatal-voice` transport adapter, frame codec, local mock |
+| Search injection | `codex/boplex-search-integration` | `/search` client, grounding formatter, integration tests |
 
 ---
 
@@ -93,7 +115,9 @@ App-specific code goes in `apps/` ONLY.
 - Config: yaatal-api uses Loco's own config (`config/development.yaml`); yaatal-core retains its own config loader. Both coexist — Loco manages server/auth/DB, yaatal-core manages AI keys.
 - Loco users table vs yaatal-core profiles: dual-table strategy decided. Loco owns `users` (auth), yaatal-core owns `profiles` (domain). Link via `user_id → users.id` migration needed (E5 scope).
 - Production DB: local/dev still center on SQLite; Railway/Postgres deployment is now an active integration path. Turso/libSQL remains part of the longer-term engine direction, not the only deploy target.
-- Current remaining work is integration-heavy rather than scaffold-heavy: CI correctness, deployment/runtime hardening, E6 completion, and app/runtime wiring.
+- Current live voice surface is still `POST /api/voice/transcribe`; no Bo-Plex WebSocket session route exists yet.
+- `yaatal-search` already proves the sidecar-over-HTTP pattern, but it is not the session orchestrator and should not become the only production search boundary by accident.
+- Current remaining work is integration-heavy rather than scaffold-heavy: session substrate, deployment/runtime hardening, E6 reframing, and app/runtime probe wiring.
 
 ---
 ## MUTATION LOG
@@ -665,6 +689,36 @@ App-specific code goes in `apps/` ONLY.
 - Railway logs/runtime investigation still blocked by CLI session/auth state
 - Full workspace parity is still distorted by incomplete `yokk-mobile` app integration on the control branch
 - Local Windows cargo remains sensitive to cache corruption, network reachability, and `libsql` native toolchain behavior; use bootstrap script plus isolated cargo dirs when needed
+
+### Session 025 — 2026-04-12 (Bo-Plex Vision Reset + Setup Lanes)
+**Architect:** Codex
+**What happened:**
+- Reframed the repo around the current Bo-Plex target architecture:
+  - Engine on Railway
+  - PersonaPlex as external WebSocket upstream
+  - one external `/search` service boundary
+  - thin client contracts using JSON envelopes + base64 audio
+- Cleaned the canonical documented surface to remove stale tech/model framing:
+  - updated `README.md`
+  - updated `ARCHITECT-ENGINE.md`
+  - updated `SPRINT-LOG.md`
+  - replaced `crates/yaatal-api/README.md`
+  - updated `crates/yaatal-feed/README.md`
+  - updated `docs/deployment/railway.md`
+  - added `docs/architecture/boplex-setup.md`
+  - extended `.env.example` with planned Bo-Plex runtime variables
+- Created dedicated Bo-Plex implementation worktrees from `codex/deploy-candidate`:
+  - `codex/boplex-session-api`
+  - `codex/boplex-personaplex-adapter`
+  - `codex/boplex-search-integration`
+**What's next:**
+- Build the local-mock PersonaPlex adapter lane first
+- Add `/api/voice/session` and in-memory session state second
+- Wire the real `/search` service and grounding injection third
+**Blockers:**
+- No WebSocket session substrate exists yet in code
+- Search contract is documented now but not fully implemented in the Engine
+- Crate-scoped baseline checks in the fresh worktrees need a longer shell timeout than this session used for warm-up builds
 ---
 
 ## END SESSION PROTOCOL

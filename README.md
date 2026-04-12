@@ -1,75 +1,95 @@
 # Yaatal Engine
 
-**AI-native infrastructure for African-first applications. Built in Rust.**
+**Voice/session orchestration engine for grounded African-first applications. Built in Rust.**
 
 > Owned by YAATAL LABS LLC
 
----
+## What this repo is now
 
-## What is this?
+Yaatal Engine is a Rust workspace centered on one responsibility: **the Engine brokers authenticated app sessions to external services**.
 
-Yaatal Engine is a reusable Rust workspace that provides shared infrastructure
-for African-first applications. The first consumer is
-[YOKK](https://github.com/MouhamedN96/YOKK) — a community platform for
-African tech builders.
+The current near-term focus is **Bo-Plex**:
 
-## Architecture
+- client streams audio to the Engine over WebSocket
+- Engine brokers that session to PersonaPlex
+- Engine watches the upstream text stream
+- Engine calls one real `/search` service over HTTP when grounding is needed
+- Engine injects grounded context back into the live voice session
 
+This is an R&D engine project, not a finished SaaS product. The goal is to make the orchestration loop real and testable first.
+
+## Current architecture
+
+```text
+Client UI (Flutter / thin probe)
+  ↕ WebSocket + JSON envelopes
+Yaatal Engine (Railway-hosted yaatal-api)
+  ↕ WebSocket
+PersonaPlex (local mock first, RunPod later)
+
+Yaatal Engine
+  ↕ HTTP
+/search service
+  ↕ internal retrieval stack
+BGE-M3 + Qdrant
 ```
-crates/yaatal-core     — AI router, models, gamification, design tokens
-crates/yaatal-api      — Loco HTTP backend
-crates/yaatal-voice    — cpal recording + Whisper transcription
-crates/yaatal-search   — ColBERT semantic search (future)
-apps/yokk-mobile       — YOKK Dioxus mobile app
-```
 
-## Crates
+## Workspace surfaces
 
-| Crate | Purpose | Status |
-|-------|---------|--------|
-| `yaatal-core` | Shared types, AI cascade, XP system, models | In Progress |
-| `yaatal-api` | Loco REST API | Scaffold |
-| `yaatal-voice` | Audio recording + transcription | Scaffold |
-| `yaatal-search` | Semantic search | Planned |
-| `yokk-mobile` | YOKK Dioxus frontend | Planned |
+| Surface | Current role | Status |
+|---------|--------------|--------|
+| `crates/yaatal-core` | Shared domain models, AI/router primitives, DB helpers, gamification, sanitization | Real, broad |
+| `crates/yaatal-api` | Deployed backend and the main Bo-Plex orchestration surface | Active focus |
+| `crates/yaatal-feed` | Generic feed/discovery ranking engine | Integrated |
+| `crates/yaatal-voice` | Audio utilities and batch transcription fallback; next home of thin PersonaPlex transport | In transition |
+| `crates/yaatal-search` | Search evaluation and HTTP-client-side retrieval utilities, not the live session orchestrator | Experimental |
+| `apps/yokk-mobile` | Thin app/runtime probe; not the current engineering driver | Stub |
 
-## Getting Started
+## Current direction
+
+- **Engine is the orchestrator.** The app should stay thin.
+- **PersonaPlex stays external.** Use a local mock first, RunPod later.
+- **Search stays behind one HTTP contract.** The Engine calls `/search`; BGE-M3 and Qdrant stay behind that service.
+- **Redis and SigLIP2 are deferred.** First make the vocal loop work.
+- **Legacy voice/search descriptions in older session logs are historical, not current target architecture.**
+
+The detailed setup and implementation split live in [docs/architecture/boplex-setup.md](docs/architecture/boplex-setup.md).
+
+## Getting started
 
 ```bash
-# Clone
 git clone https://github.com/Yaatal-labs/Yaatal-Engine.git
 cd Yaatal-Engine
 
-# Build
-cargo build --workspace
+cargo fmt --all --check
+cargo check --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace -- --test-threads=1
+```
 
-# Test
-cargo test --workspace
+Copy the environment template and fill in the current runtime values:
 
-# Environment
+```bash
 cp .env.example .env
-# Fill in your API keys
 ```
 
-## Railway
+For Windows dev shells, use the bootstrap helpers in `scripts/` so Cargo sees `cp.exe` and the MSVC toolchain.
 
-`Yaatal-Engine` deploys the `yaatal-api` binary on Railway. For a fresh service or a drifted one, use:
+## Deployment shape
 
-```powershell
-.\scripts\railway-bootstrap.ps1
-.\scripts\railway-bootstrap.ps1 -Apply
-```
+- Railway hosts `yaatal-api`
+- Railway/Postgres is the current deployed database path
+- PersonaPlex is an external service boundary
+- `/search` is an external service boundary
 
-The bootstrap script verifies the sibling Postgres service, ensures the required runtime variables exist, and triggers a single redeploy. Full notes live in [`docs/deployment/railway.md`](docs/deployment/railway.md).
+The current Railway setup is documented in [docs/deployment/railway.md](docs/deployment/railway.md).
 
-## Configuration
+## Canonical docs
 
-This repo has two config trees:
-
-- `crates/yaatal-api/config/` — Loco runtime config for the deployed API
-- `config/` — engine-level workspace config from the initial scaffold
-
-Railway boots `yaatal-api` from `crates/yaatal-api/config/`, not the root `config/` folder.
+- [ARCHITECT-ENGINE.md](ARCHITECT-ENGINE.md) — project protocol, current stage, active execution lanes
+- [SPRINT-LOG.md](SPRINT-LOG.md) — session history and current sprint-level status
+- [docs/architecture/boplex-setup.md](docs/architecture/boplex-setup.md) — Bo-Plex implementation approach and worktree split
+- [docs/deployment/railway.md](docs/deployment/railway.md) — current backend deployment path
 
 ## License
 

@@ -368,3 +368,34 @@
 **Blockers:**
 - Full-workspace status is still muddied by incomplete `yokk-mobile`
 - Local Windows cargo verification remains sensitive to network access and native `libsql` build requirements
+
+## Day 20 — 2026-04-12 (Bo-Plex Vision Reset + Setup Plan)
+**Goal:** Replace stale stack/docs framing with the current Bo-Plex orchestration vision and split the work into clean implementation lanes.
+**Status:** IN PROGRESS
+**Completed:**
+- [x] Reframed the repo around the current Bo-Plex target:
+  - [x] Engine on Railway
+  - [x] PersonaPlex as external WebSocket upstream
+  - [x] one external `/search` boundary
+  - [x] thin client contracts using JSON envelopes + base64 audio
+- [x] Updated the canonical documented surface:
+  - [x] `README.md`
+  - [x] `ARCHITECT-ENGINE.md`
+  - [x] `SPRINT-LOG.md`
+  - [x] `crates/yaatal-api/README.md`
+  - [x] `crates/yaatal-feed/README.md`
+  - [x] `docs/deployment/railway.md`
+  - [x] `docs/architecture/boplex-setup.md`
+  - [x] `.env.example`
+- [x] Created dedicated implementation worktrees from `codex/deploy-candidate`:
+  - [x] `codex/boplex-session-api`
+  - [x] `codex/boplex-personaplex-adapter`
+  - [x] `codex/boplex-search-integration`
+**Pending:**
+- [ ] Finish crate-scoped baseline verification in each new worktree with longer cargo timeouts
+- [ ] Implement PersonaPlex local mock + transport adapter
+- [ ] Implement `/api/voice/session` with JWT auth and in-memory session state
+- [ ] Implement `/search` client + grounding injection path
+**Blockers:**
+- The current codebase still has only `POST /api/voice/transcribe`; no live voice-session route exists yet
+- The search boundary is documented, but not yet wired into `yaatal-api`

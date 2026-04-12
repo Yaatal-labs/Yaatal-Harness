@@ -1,6 +1,13 @@
 # Railway Deployment
 
-`Yaatal-Engine` deploys the `yaatal-api` binary, not the whole workspace.
+Railway hosts the **Engine**. It does not need to host the full model stack.
+
+Current hosted shape:
+
+- Railway: `yaatal-api`
+- Railway: Postgres
+- External service: PersonaPlex (local mock first, RunPod later)
+- External service: `/search` HTTP endpoint
 
 ## One-command bootstrap
 
@@ -13,7 +20,7 @@ From the repo root:
 
 The script assumes this checkout is already linked to the correct Railway project and environment.
 
-What the script does:
+What the script does today:
 
 - verifies Railway CLI auth
 - verifies the linked environment exists
@@ -37,19 +44,26 @@ The API binary also self-heals two monorepo-specific Loco defaults:
 - if `LOCO_CONFIG_FOLDER` is unset and `crates/yaatal-api/config` exists, it uses that folder
 - if `RAILWAY_ENVIRONMENT=production` and `LOCO_ENV` is unset, it boots in `production`
 
-That means fresh Railway services only need the real runtime secrets:
+## Current required variables
+
+The current deployed API still only requires:
 
 - `DATABASE_URL`
 - `JWT_SECRET`
 
-## Config layout
+## Planned Bo-Plex variables
 
-This repo has two config trees:
+Prepare these as the session loop lands:
 
-- `crates/yaatal-api/config/` is the Loco runtime config for the deployed API
-- `config/` is engine-level workspace config from the initial scaffold and is not the Railway boot source for `yaatal-api`
+- `PERSONAPLEX_WS_URL`
+- `PERSONAPLEX_BEARER_TOKEN`
+- `PERSONAPLEX_DEFAULT_PERSONA`
+- `PERSONAPLEX_DEFAULT_LANG`
+- `PERSONAPLEX_DEFAULT_MARKET`
+- `SEARCH_SERVICE_URL`
+- `SEARCH_SERVICE_TIMEOUT_SECONDS`
 
-If Railway starts the API against the root `config/` folder, you will see schema mismatches like missing `database.enable_logging`.
+These are not all wired in code yet. They are the documented runtime shape for the Bo-Plex rollout.
 
 ## Verification
 
@@ -68,10 +82,8 @@ Healthy deploy checklist:
 - deploy logs stop repeating `/health` failures
 - the Railway service remains running after the healthcheck window
 
-## Optional follow-up
+## Notes
 
-Once the service has a Railway or custom domain, set:
-
-- `APP_URL=https://<your-domain>`
-
-That value is not required for the service to boot, but it is the correct production host value for links and cookies.
+- Railway is the right home for the Engine and Postgres.
+- Heavy model services should stay external.
+- Redis and SigLIP2 are out of the first Bo-Plex milestone.

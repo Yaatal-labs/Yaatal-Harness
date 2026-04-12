@@ -1,58 +1,58 @@
-# Welcome to Loco :train:
+# yaatal-api
 
-[Loco](https://loco.rs) is a web and API framework running on Rust.
+`yaatal-api` is the public orchestration surface for Yaatal Engine.
 
-This is the **SaaS starter** which includes a `User` model and authentication based on JWT.
-It also include configuration sections that help you pick either a frontend or a server-side template set up for your fullstack server.
+It already owns the deployed backend path on Railway. The next step is to grow it from a REST backend with a batch voice endpoint into the **Bo-Plex session orchestrator**.
 
+## What it owns today
 
-## Quick Start
+- `GET /health`
+- auth routes
+- posts/comments routes
+- `GET /api/feed`
+- `POST /api/voice/transcribe`
+- offline placeholder routes
 
-```sh
-cargo loco start
+## What it will own next
+
+- `GET /api/voice/session` WebSocket endpoint
+- JWT-authenticated session lifecycle
+- per-session text buffer and turn state
+- HTTP calls to the external `/search` service
+- context injection back into the active PersonaPlex session
+
+The Engine layer belongs here because session orchestration depends on:
+
+- auth and identity
+- request/session logging
+- API contracts
+- retries, timeouts, and failure handling
+
+That logic should not live in `yaatal-voice`.
+
+## Runtime shape
+
+```text
+Client UI
+  ↕ WebSocket + JSON envelopes
+yaatal-api
+  ↕ WebSocket
+PersonaPlex
+
+yaatal-api
+  ↕ HTTP
+/search service
 ```
 
-```sh
-$ cargo loco start
-Finished dev [unoptimized + debuginfo] target(s) in 21.63s
-    Running `target/debug/myapp start`
+## Local run
 
-    :
-    :
-    :
-
-controller/app_routes.rs:203: [Middleware] Adding log trace id
-
-                      ▄     ▀
-                                 ▀  ▄
-                  ▄       ▀     ▄  ▄ ▄▀
-                                    ▄ ▀▄▄
-                        ▄     ▀    ▀  ▀▄▀█▄
-                                          ▀█▄
-▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄   ▄▄▄▄▄▄▄▄▄▄▄ ▄▄▄▄▄▄▄▄▄ ▀▀█
- ██████  █████   ███ █████   ███ █████   ███ ▀█
- ██████  █████   ███ █████   ▀▀▀ █████   ███ ▄█▄
- ██████  █████   ███ █████       █████   ███ ████▄
- ██████  █████   ███ █████   ▄▄▄ █████   ███ █████
- ██████  █████   ███  ████   ███ █████   ███ ████▀
-   ▀▀▀██▄ ▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀  ▀▀▀▀▀▀▀▀▀▀ ██▀
-       ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-                https://loco.rs
-
-environment: development
-   database: automigrate
-     logger: debug
-compilation: debug
-      modes: server
-
-listening on http://localhost:5150
+```bash
+cargo run -p yaatal-api --bin yaatal_api-cli -- start
 ```
 
-## Full Stack Serving
+When run from the workspace root, the binary auto-detects `crates/yaatal-api/config`.
 
-You can check your [configuration](config/development.yaml) to pick either frontend setup or server-side rendered template, and activate the relevant configuration sections.
+## Notes
 
-
-## Getting help
-
-Check out [a quick tour](https://loco.rs/docs/getting-started/tour/) or [the complete guide](https://loco.rs/docs/getting-started/guide/).
+- `POST /api/voice/transcribe` stays as fallback/batch infrastructure during Bo-Plex setup.
+- Feed and future voice grounding remain separate surfaces. `yaatal-feed` is a reusable ranking engine, not the live session orchestrator.
