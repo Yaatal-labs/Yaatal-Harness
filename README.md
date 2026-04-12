@@ -18,6 +18,12 @@ The current near-term focus is **Bo-Plex**:
 
 This is an R&D engine project, not a finished SaaS product. The goal is to make the orchestration loop real and testable first.
 
+To get usability fast, the Bo-Plex build is now split into **three runnable surfaces** inside the monorepo:
+
+- a voice service surface
+- a search service surface
+- the Engine orchestrator surface
+
 ## Current architecture
 
 ```text
@@ -50,6 +56,7 @@ BGE-M3 + Qdrant
 - **Engine is the orchestrator.** The app should stay thin.
 - **PersonaPlex stays external.** Use a local mock first, RunPod later.
 - **Search stays behind one HTTP contract.** The Engine calls `/search`; BGE-M3 and Qdrant stay behind that service.
+- **Voice and search should each become independently runnable/testable.** Keep them in the monorepo, but stop treating them as only internal helpers.
 - **Redis and SigLIP2 are deferred.** First make the vocal loop work.
 - **Legacy voice/search descriptions in older session logs are historical, not current target architecture.**
 

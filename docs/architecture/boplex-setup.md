@@ -13,6 +13,7 @@ The goal is not a finished product. The goal is one hosted, testable orchestrati
 - Engine injects grounded text context back into the live session
 
 This milestone intentionally excludes Redis, SigLIP2, generalized tool routing, ZeroClaw, and Path B model orchestration.
+It also treats `yaatal-voice` and `yaatal-search` as **independently runnable service surfaces**, not just internal helper crates.
 
 ## Locked approach
 
@@ -20,6 +21,7 @@ This milestone intentionally excludes Redis, SigLIP2, generalized tool routing, 
 - **Client stays thin.** Use JSON envelopes plus base64 audio over WebSocket.
 - **PersonaPlex stays external.** Start with a local mock; swap to RunPod later.
 - **Search stays behind one HTTP contract.** The Engine calls `/search`; BGE-M3 and Qdrant stay behind that service.
+- **Voice and search each get their own runnable surface.** Build usability by making them directly testable before the Engine owns the whole loop.
 - **Grounding goes upstream as text context.** No generalized tool-call framework in milestone 1.
 
 ## Interfaces
@@ -44,17 +46,18 @@ Engine message types:
 
 The client contract should stay JSON-shaped even when audio payloads are base64. The internal engine should convert that envelope into typed session events immediately.
 
-### Engine ↔ PersonaPlex
+### Voice service ↔ PersonaPlex
 
-Thin transport adapter in `yaatal-voice`:
+`yaatal-voice` should expose a runnable service surface first:
 
-- upstream connect/disconnect
-- send audio/control frames
-- receive audio/text/turn-end/error frames
+- local PersonaPlex-compatible mock server
+- upstream connect/disconnect support
+- audio/control frame send path
+- audio/text/turn-end/error frame receive path
 
-Raw `0x01` / `0x02` details stay at the adapter edge. They do not become the Engine-wide contract.
+Raw `0x01` / `0x02` details stay at the `yaatal-voice` adapter edge. They do not become the Engine-wide contract.
 
-### Engine ↔ Search service
+### Search service contract
 
 `POST /search`
 
@@ -89,28 +92,30 @@ Response:
 }
 ```
 
-The Engine formats the top results into one compact grounding block and injects it back into PersonaPlex as a text context message.
+`yaatal-search` should own the runnable HTTP surface for this contract. The Engine formats the top results into one compact grounding block and injects it back into PersonaPlex as a text context message.
 
 ## Worktree split
 
-This is not a one-session implementation. The repo now has dedicated worktrees from `codex/deploy-candidate`:
+This is not a one-session implementation. The repo now has dedicated service-first worktrees from `codex/deploy-candidate`:
 
 | Worktree | Branch | Responsibility |
 |----------|--------|----------------|
-| `.worktrees/boplex-session-api` | `codex/boplex-session-api` | `yaatal-api` WebSocket route, JWT auth, session state, event normalization |
-| `.worktrees/boplex-personaplex-adapter` | `codex/boplex-personaplex-adapter` | `yaatal-voice` PersonaPlex adapter, frame codec, local mock server |
-| `.worktrees/boplex-search-integration` | `codex/boplex-search-integration` | `/search` client, grounding formatter, integration tests and failure handling |
+| `.worktrees/voice-service` | `codex/voice-service` | runnable PersonaPlex-compatible local mock and `yaatal-voice` transport surface |
+| `.worktrees/search-service` | `codex/search-service` | runnable `POST /search` HTTP service and `yaatal-search` contract |
+| `.worktrees/engine-orchestrator` | `codex/engine-orchestrator` | `yaatal-api` WebSocket session route, JWT auth, per-turn state, service orchestration |
 
 Recommended merge order:
 
-1. PersonaPlex adapter + mock
-2. API session route + in-memory session state
-3. Search injection and end-to-end vocal loop tests
+1. search service
+2. voice service
+3. engine orchestrator
 
 ## First usable milestone
 
 The first milestone is successful when:
 
+- the search service can run locally and answer `POST /search`
+- the voice service can run locally as a PersonaPlex-compatible mock
 - authenticated client can open `/api/voice/session`
 - Engine can proxy audio to a local mock PersonaPlex service
 - Engine can accumulate transcript text for a turn

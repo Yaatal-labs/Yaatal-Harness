@@ -91,6 +91,7 @@ App-specific code goes in `apps/` ONLY.
 - Engine is the orchestrator. `yaatal-api` owns session lifecycle, auth, routing, and retries.
 - PersonaPlex stays external. Start with a local mock, then swap to RunPod.
 - Search stays behind one HTTP boundary. The Engine calls `/search`; BGE-M3 and Qdrant stay behind that service.
+- `yaatal-voice` and `yaatal-search` should become independently runnable/testable service surfaces inside the monorepo.
 - Client contracts stay thin: JSON envelopes plus base64 audio over WebSocket.
 - Grounding returns upstream as text context injection.
 - Redis, SigLIP2, ZeroClaw, Path B orchestration, and heavy app work are out of the first milestone.
@@ -102,9 +103,9 @@ App-specific code goes in `apps/` ONLY.
 | Lane | Branch / worktree | Scope |
 |------|--------------------|-------|
 | Control / integration | `codex/deploy-candidate` | canonical branch for deployable backend and docs |
-| Bo-Plex session API | `codex/boplex-session-api` | `yaatal-api` WebSocket route, JWT auth, in-memory session state |
-| PersonaPlex adapter | `codex/boplex-personaplex-adapter` | `yaatal-voice` transport adapter, frame codec, local mock |
-| Search injection | `codex/boplex-search-integration` | `/search` client, grounding formatter, integration tests |
+| Voice service | `codex/voice-service` | runnable PersonaPlex-compatible mock plus `yaatal-voice` transport surface |
+| Search service | `codex/search-service` | runnable `/search` HTTP surface plus `yaatal-search` service contract |
+| Engine orchestrator | `codex/engine-orchestrator` | `yaatal-api` WebSocket session route, JWT auth, per-turn state, service orchestration |
 
 ---
 
@@ -117,6 +118,7 @@ App-specific code goes in `apps/` ONLY.
 - Production DB: local/dev still center on SQLite; Railway/Postgres deployment is now an active integration path. Turso/libSQL remains part of the longer-term engine direction, not the only deploy target.
 - Current live voice surface is still `POST /api/voice/transcribe`; no Bo-Plex WebSocket session route exists yet.
 - `yaatal-search` already proves the sidecar-over-HTTP pattern, but it is not the session orchestrator and should not become the only production search boundary by accident.
+- `yaatal-voice` and `yaatal-search` are still mostly library-shaped today. The next step is to give each a runnable service surface before deeper Engine coupling.
 - Current remaining work is integration-heavy rather than scaffold-heavy: session substrate, deployment/runtime hardening, E6 reframing, and app/runtime probe wiring.
 
 ---
@@ -719,6 +721,29 @@ App-specific code goes in `apps/` ONLY.
 - No WebSocket session substrate exists yet in code
 - Search contract is documented now but not fully implemented in the Engine
 - Crate-scoped baseline checks in the fresh worktrees need a longer shell timeout than this session used for warm-up builds
+
+### Session 026 — 2026-04-12 (Service-First Lane Split)
+**Architect:** Codex
+**What happened:**
+- Revised the Bo-Plex implementation split from adapter-centric lanes to service-centric lanes:
+  - voice service
+  - search service
+  - engine orchestrator
+- Created new worktrees from `codex/deploy-candidate`:
+  - `codex/voice-service`
+  - `codex/search-service`
+  - `codex/engine-orchestrator`
+- Verified baseline state:
+  - `cargo check -p yaatal-search`: PASS on `codex/search-service`
+  - `cargo check -p yaatal-voice`: blocked by `libsql-sqlite3-parser` Windows build-script permission failure in this shell
+  - `cargo check -p yaatal-api`: blocked by `libsql-ffi` / `cp` and the same Windows native build environment issue in this shell
+- Updated the docs again to make the service-first split explicit
+**What's next:**
+- Build `yaatal-search` into the first runnable HTTP service surface
+- Build `yaatal-voice` into the PersonaPlex-compatible local mock/service surface
+- Keep `yaatal-api` focused on orchestration only
+**Blockers:**
+- Windows Cargo environment still blocks native `libsql`-linked crates in some worktrees
 ---
 
 ## END SESSION PROTOCOL

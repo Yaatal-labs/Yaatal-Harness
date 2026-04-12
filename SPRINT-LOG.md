@@ -399,3 +399,22 @@
 **Blockers:**
 - The current codebase still has only `POST /api/voice/transcribe`; no live voice-session route exists yet
 - The search boundary is documented, but not yet wired into `yaatal-api`
+
+## Day 21 — 2026-04-12 (Service-First Split for Usability)
+**Goal:** Restructure Bo-Plex execution around independently runnable voice/search services plus a thinner Engine orchestrator.
+**Status:** IN PROGRESS
+**Completed:**
+- [x] Created new service-first worktrees from `codex/deploy-candidate`:
+  - [x] `codex/voice-service`
+  - [x] `codex/search-service`
+  - [x] `codex/engine-orchestrator`
+- [x] Updated docs to reflect the new split and supersede the older adapter-centric Bo-Plex lanes
+- [x] Verified `codex/search-service` baseline:
+  - [x] `cargo check -p yaatal-search`
+**Pending:**
+- [ ] Turn `yaatal-search` into a runnable `/search` service
+- [ ] Turn `yaatal-voice` into a runnable PersonaPlex-compatible local mock/service
+- [ ] Keep `yaatal-api` scoped to WebSocket session orchestration and service calls only
+**Blockers:**
+- `codex/voice-service` is still blocked in this shell by the `libsql-sqlite3-parser` Windows build-script permission failure
+- `codex/engine-orchestrator` is still blocked in this shell by `libsql-ffi` native build requirements and the same Windows environment issue
