@@ -1,12 +1,14 @@
 # yaatal-search
 
-`yaatal-search` should become the **search service surface** for the Bo-Plex loop.
+`yaatal-search` is now the **search service surface** for the Bo-Plex loop on the active service lane.
 
-Today it already proves the sidecar/HTTP pattern. The next step is to make it directly runnable as the service behind:
+Current branch reality:
 
-```text
-POST /search
-```
+- on `codex/deploy-candidate`, this crate still reads as an internal retrieval/eval surface
+- on `codex/search-service` at `02b10a8`, it already exposes a runnable service with:
+  - `GET /health`
+  - `POST /search`
+  - `POST /index/upsert`
 
 The Engine should call that contract and stay ignorant of the retrieval internals behind it.
 
@@ -26,12 +28,20 @@ The Engine should call that contract and stay ignorant of the retrieval internal
 
 Those stay in `yaatal-api`.
 
-## Intended runnable surface
+## Runnable surface
 
-This crate should grow a runnable service binary, for example:
+On the service lane, this crate now includes a runnable service binary:
 
 ```text
 src/bin/search_service.rs
 ```
 
-That binary becomes the first directly testable retrieval surface for the Bo-Plex loop.
+That is the first directly testable retrieval surface for the Bo-Plex loop.
+
+## Harness fit
+
+If the older internal harness is reused later, this is the best place to do it:
+
+- `Retriever -> Ranker -> PolicyEngine` can live behind the current `POST /search` contract
+- the Engine should still remain blind to those internals
+- BGE-M3 + Qdrant + Postgres remain the likely real backend direction

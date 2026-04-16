@@ -181,6 +181,29 @@ The practical conclusion is:
 - voice harness code is not directly reusable yet
 - the current Engine/service split is the correct outer architecture even if harness-style internals are adopted later
 
+## Next lowest-hanging task
+
+For the next session, the lowest-hanging task is not more redesign. It is loop proof.
+
+Concrete target:
+
+1. bring the three service lanes together in order:
+   - `codex/search-service`
+   - `codex/voice-service`
+   - `codex/engine-orchestrator`
+2. run all three locally
+3. exercise one `/api/voice/session` flow with:
+   - mock voice upstream
+   - real `POST /search`
+   - one grounding injection round-trip
+4. capture the exact startup/run commands so the Engine becomes repeatably testable
+
+This is also the right bridge to the later `Harness × Runtime` vision:
+
+- it proves the stable service boundary now
+- it leaves room to swap search internals to harness-style pipelines later
+- it leaves room to replace the mock voice backend with PersonaPlex later
+
 ## Out of scope for now
 
 - Redis-backed session coordination

@@ -24,6 +24,16 @@ To get usability fast, the Bo-Plex build is now split into **three runnable surf
 - a search service surface
 - the Engine orchestrator surface
 
+Those surfaces now exist on dedicated branches:
+
+| Branch | Commit | State |
+|--------|--------|-------|
+| `codex/search-service` | `02b10a8` | runnable phase-one search service; green |
+| `codex/voice-service` | `b587e0b` | runnable PersonaPlex-compatible local mock/service; green |
+| `codex/engine-orchestrator` | `4c9876b` | Engine wired to both service contracts; green on targeted `yaatal-api` gates |
+
+Important: those states are **not yet merged** into `codex/deploy-candidate` or `main`.
+
 ## Current architecture
 
 ```text
@@ -45,10 +55,10 @@ BGE-M3 + Qdrant
 | Surface | Current role | Status |
 |---------|--------------|--------|
 | `crates/yaatal-core` | Shared domain models, AI/router primitives, DB helpers, gamification, sanitization | Real, broad |
-| `crates/yaatal-api` | Deployed backend and the main Bo-Plex orchestration surface | Active focus |
+| `crates/yaatal-api` | Deployed backend and the main Bo-Plex orchestration surface | Canonical branch: transcribe-only; engine lane: session-wired |
 | `crates/yaatal-feed` | Generic feed/discovery ranking engine | Integrated |
-| `crates/yaatal-voice` | Audio utilities and batch transcription fallback; next home of thin PersonaPlex transport | In transition |
-| `crates/yaatal-search` | Search evaluation and HTTP-client-side retrieval utilities, not the live session orchestrator | Experimental |
+| `crates/yaatal-voice` | Audio utilities, mock voice service, and batch transcription fallback | Service lane green |
+| `crates/yaatal-search` | Search service surface plus retrieval contracts/helpers | Service lane green |
 | `apps/yokk-mobile` | Thin app/runtime probe; not the current engineering driver | Stub |
 
 ## Current direction
@@ -56,11 +66,28 @@ BGE-M3 + Qdrant
 - **Engine is the orchestrator.** The app should stay thin.
 - **PersonaPlex stays external.** Use a local mock first, RunPod later.
 - **Search stays behind one HTTP contract.** The Engine calls `/search`; BGE-M3 and Qdrant stay behind that service.
-- **Voice and search should each become independently runnable/testable.** Keep them in the monorepo, but stop treating them as only internal helpers.
+- **Voice and search are independently runnable/testable on their service branches.** Keep them in the monorepo and preserve those service contracts during merge-back.
 - **Redis and SigLIP2 are deferred.** First make the vocal loop work.
 - **Legacy voice/search descriptions in older session logs are historical, not current target architecture.**
 
+The older internal `Harness × Runtime` framing is only partially current now:
+
+- still valid: stable contract over swappable internals
+- needs reinterpretation: one standalone binary and HTTP-only voice
+- obsolete: ColBERT / FocalCodec / LFM2-centered implementation assumptions
+
 The detailed setup and implementation split live in [docs/architecture/boplex-setup.md](docs/architecture/boplex-setup.md).
+
+## Next session focus
+
+The next lowest-hanging task is to make the Engine locally testable end-to-end without changing the outer architecture again:
+
+1. merge or temporarily stack `codex/search-service`, `codex/voice-service`, and `codex/engine-orchestrator`
+2. start all three services locally
+3. run one scripted `/api/voice/session` smoke flow against the mock voice service and real `/search` service
+4. keep the current service contracts unchanged
+
+That gets the Engine testable now while preserving the longer-term `Harness × Runtime` principle: stable boundary outside, swappable internals later.
 
 ## Getting started
 
@@ -88,6 +115,7 @@ For Windows dev shells, use the bootstrap helpers in `scripts/` so Cargo sees `c
 - Railway/Postgres is the current deployed database path
 - PersonaPlex is an external service boundary
 - `/search` is an external service boundary
+- the first full local loop still needs to be run with all three services started together
 
 The current Railway setup is documented in [docs/deployment/railway.md](docs/deployment/railway.md).
 
