@@ -110,6 +110,22 @@ Recommended merge order:
 2. voice service
 3. engine orchestrator
 
+## Current branch state
+
+The service-first split is no longer just planned. The active branches currently sit at:
+
+| Branch | Commit | State |
+|--------|--------|-------|
+| `codex/search-service` | `02b10a8` | green and committed; runnable phase-one `/search` service exists |
+| `codex/voice-service` | `b587e0b` | green and committed; runnable PersonaPlex-compatible local mock/service surface exists |
+| `codex/engine-orchestrator` | `4c9876b` | green on targeted `yaatal-api` gates; `/api/voice/session` now wires voice and search services into the Engine |
+
+Important nuance:
+
+- these states exist on the dedicated service/worktree branches
+- they are not yet merged back into `codex/deploy-candidate`
+- they are not on `main`
+
 ## First usable milestone
 
 The first milestone is successful when:
@@ -123,6 +139,47 @@ The first milestone is successful when:
 - Engine injects grounded text context upstream
 - session stays alive if `/search` fails
 - existing `POST /api/voice/transcribe` still works as fallback/batch
+
+## Harness-x-Runtime translation
+
+The older `Harness × Runtime` memo is still useful, but only if reinterpreted through the current service split.
+
+Still valid:
+
+- keep the external contract stable while internals change
+- treat runtime/backend switching as config, not code rewrites
+- copy architectural patterns from external runtimes, not their code structure
+
+Needs reinterpretation:
+
+- `YAATAL = standalone Axum binary`
+  - update to: `YAATAL = service ecosystem with one Engine/orchestrator boundary`
+- `/search`, `/voice`, `/feed` as all-HTTP endpoints
+  - update to: search stays HTTP, voice is WebSocket session-first
+- “runtime does not matter”
+  - true only at the service contract layer; voice callers still must honor the typed WebSocket message contract
+
+Obsolete:
+
+- ColBERT / MaxSim / FocalCodec / LFM2-Audio as the assumed implementation center
+- single-binary harness as the dominant deployment target
+- ZeroClaw-style runtime assumptions as the main integration frame
+
+## Harness usability mirror
+
+If the older internal harness were updated to mirror the current Engine design, its fit would be:
+
+| Harness area | Current fit to Engine | What would be needed |
+|-------------|------------------------|----------------------|
+| Search pipeline | medium-high | keep `Retriever -> Ranker -> PolicyEngine`, but hide it behind the current `POST /search` contract |
+| Voice pipeline | low | add a real WebSocket session model, turn boundaries, subtitle/audio events, and context injection |
+| API/runtime layer | low-medium | replace the current stub with real Axum/Loco routes and make it call the service contracts, not internal stubs |
+
+The practical conclusion is:
+
+- search harness ideas are reusable behind the current search service
+- voice harness code is not directly reusable yet
+- the current Engine/service split is the correct outer architecture even if harness-style internals are adopted later
 
 ## Out of scope for now
 

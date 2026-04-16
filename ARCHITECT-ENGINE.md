@@ -82,7 +82,11 @@ App-specific code goes in `apps/` ONLY.
 - Operating mode: the project has moved from scaffold/buildout into integration, correctness, deployment, and service orchestration.
 - Backend status: the service/backend path is real enough to verify and deploy in isolation.
 - Current target: stand up the first Bo-Plex vocal loop with a local mock PersonaPlex upstream and a real `/search` service.
-- Remaining risk concentration: WebSocket session substrate, voice transport adapter, search injection, deployment/runtime wiring, and app-side probe integration.
+- Current branch reality:
+  - `codex/search-service` is green at `02b10a8`
+  - `codex/voice-service` is green at `b587e0b`
+  - `codex/engine-orchestrator` is wired at `4c9876b`
+- Remaining risk concentration: merging the lane stack back cleanly, running the first full local loop, and replacing mock backends with real ones without breaking the service contracts.
 
 ---
 
@@ -100,12 +104,12 @@ App-specific code goes in `apps/` ONLY.
 
 ## ACTIVE EXECUTION LANES
 
-| Lane | Branch / worktree | Scope |
-|------|--------------------|-------|
-| Control / integration | `codex/deploy-candidate` | canonical branch for deployable backend and docs |
-| Voice service | `codex/voice-service` | runnable PersonaPlex-compatible mock plus `yaatal-voice` transport surface |
-| Search service | `codex/search-service` | runnable `/search` HTTP surface plus `yaatal-search` service contract |
-| Engine orchestrator | `codex/engine-orchestrator` | `yaatal-api` WebSocket session route, JWT auth, per-turn state, service orchestration |
+| Lane | Branch / worktree | Scope | Status |
+|------|--------------------|-------|--------|
+| Control / integration | `codex/deploy-candidate` | canonical branch for deployable backend and docs | clean, but behind active service lanes |
+| Voice service | `codex/voice-service` | runnable PersonaPlex-compatible mock plus `yaatal-voice` transport surface | green at `b587e0b` |
+| Search service | `codex/search-service` | runnable `/search` HTTP surface plus `yaatal-search` service contract | green at `02b10a8` |
+| Engine orchestrator | `codex/engine-orchestrator` | `yaatal-api` WebSocket session route, JWT auth, per-turn state, service orchestration | green on targeted gates at `4c9876b` |
 
 ---
 
@@ -117,9 +121,12 @@ App-specific code goes in `apps/` ONLY.
 - Loco users table vs yaatal-core profiles: dual-table strategy decided. Loco owns `users` (auth), yaatal-core owns `profiles` (domain). Link via `user_id → users.id` migration needed (E5 scope).
 - Production DB: local/dev still center on SQLite; Railway/Postgres deployment is now an active integration path. Turso/libSQL remains part of the longer-term engine direction, not the only deploy target.
 - Current live voice surface is still `POST /api/voice/transcribe`; no Bo-Plex WebSocket session route exists yet.
+- Canonical branch truth and service-lane truth are now different:
+  - on `codex/deploy-candidate`, the live voice surface is still `POST /api/voice/transcribe`
+  - on `codex/engine-orchestrator`, `/api/voice/session` exists and is wired to the voice and search service contracts
 - `yaatal-search` already proves the sidecar-over-HTTP pattern, but it is not the session orchestrator and should not become the only production search boundary by accident.
-- `yaatal-voice` and `yaatal-search` are still mostly library-shaped today. The next step is to give each a runnable service surface before deeper Engine coupling.
-- Current remaining work is integration-heavy rather than scaffold-heavy: session substrate, deployment/runtime hardening, E6 reframing, and app/runtime probe wiring.
+- `yaatal-voice` and `yaatal-search` are no longer only library-shaped on the active service branches; the next step is merge/integration, not first runnable surfaces.
+- Current remaining work is integration-heavy rather than scaffold-heavy: merge order, end-to-end loop proof, deployment/runtime hardening, and app/runtime probe wiring.
 
 ---
 ## MUTATION LOG
@@ -744,6 +751,26 @@ App-specific code goes in `apps/` ONLY.
 - Keep `yaatal-api` focused on orchestration only
 **Blockers:**
 - Windows Cargo environment still blocks native `libsql`-linked crates in some worktrees
+
+### Session 027 — 2026-04-16 (Service Lanes Green + Engine Wiring Recorded)
+**Architect:** Codex
+**What happened:**
+- Verified the service-first lanes reached concrete implementation state:
+  - `codex/search-service` green and committed at `02b10a8`
+  - `codex/voice-service` green and committed at `b587e0b`
+  - `codex/engine-orchestrator` wired and committed at `4c9876b`
+- Confirmed the current engine branch now exposes `/api/voice/session` and routes it through voice/search service clients.
+- Mapped the older `Harness × Runtime` memo against the current service-first architecture:
+  - stable contract principle retained
+  - HTTP-only and single-binary assumptions marked outdated
+  - old ColBERT/FocalCodec/LFM model framing marked obsolete for current implementation planning
+- Updated canonical docs to reflect branch reality and the current harness usability mirror.
+**What's next:**
+- Merge the service-lane stack back into `codex/deploy-candidate` in order: search → voice → engine
+- Run the first full local loop with all three services active
+- Replace mock voice/search backends incrementally while preserving the service contracts
+**Blockers:**
+- The active Bo-Plex loop still spans multiple branches; canonical branch does not yet reflect the implemented service-lane state
 ---
 
 ## END SESSION PROTOCOL

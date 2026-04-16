@@ -418,3 +418,39 @@
 **Blockers:**
 - `codex/voice-service` is still blocked in this shell by the `libsql-sqlite3-parser` Windows build-script permission failure
 - `codex/engine-orchestrator` is still blocked in this shell by `libsql-ffi` native build requirements and the same Windows environment issue
+
+## Day 22 — 2026-04-16 (Service Lanes Green + Engine Wiring Verified)
+**Goal:** Close the service-first implementation loop by making search and voice runnable and wiring both into the Engine orchestrator.
+**Status:** IN PROGRESS
+**Completed:**
+- [x] Built the first runnable `yaatal-search` service lane
+  - [x] `codex/search-service` committed at `02b10a8`
+  - [x] `/health`, `/search`, and `/index/upsert` service surface exists
+  - [x] `cargo fmt --all --check`
+  - [x] `cargo check -p yaatal-search`
+  - [x] `cargo test -p yaatal-search -- --test-threads=1`
+  - [x] `cargo clippy -p yaatal-search --all-targets -- -D warnings`
+- [x] Built the first runnable `yaatal-voice` mock/service lane
+  - [x] `codex/voice-service` committed at `b587e0b`
+  - [x] typed contracts, backend abstraction, mock backend, and runnable WebSocket server exist
+  - [x] `cargo fmt --all --check`
+  - [x] `cargo check -p yaatal-voice`
+  - [x] `cargo test -p yaatal-voice -- --test-threads=1`
+  - [x] `cargo clippy -p yaatal-voice --all-targets -- -D warnings`
+- [x] Wired the Engine to both service contracts
+  - [x] `codex/engine-orchestrator` committed at `4c9876b`
+  - [x] added `GET /api/voice/session`
+  - [x] added voice service client
+  - [x] added search service client
+  - [x] added per-turn grounding injection loop
+  - [x] `cargo fmt --all`
+  - [x] `cargo check -p yaatal-api --lib`
+  - [x] `cargo test -p yaatal-api --lib -- --test-threads=1`
+  - [x] `cargo clippy -p yaatal-api --all-targets -- -D warnings`
+- [x] Mapped the older `Harness × Runtime` memo against the current architecture and recorded the translation in canonical docs
+**Pending:**
+- [ ] Merge the service lanes back into `codex/deploy-candidate` in order
+- [ ] Start the search service, voice service, and engine together and prove the first full local vocal loop
+- [ ] Replace mock voice/search internals with real backends while keeping the service contracts stable
+**Blockers:**
+- The implemented Bo-Plex loop still lives across service/worktree branches, not on the canonical branch yet
