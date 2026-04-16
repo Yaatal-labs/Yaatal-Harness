@@ -77,6 +77,7 @@ The older internal `Harness × Runtime` framing is only partially current now:
 - obsolete: ColBERT / FocalCodec / LFM2-centered implementation assumptions
 
 The detailed setup and implementation split live in [docs/architecture/boplex-setup.md](docs/architecture/boplex-setup.md).
+The concrete next-session loop proof is documented in [docs/architecture/local-boplex-smoke.md](docs/architecture/local-boplex-smoke.md).
 
 ## Next session focus
 
@@ -124,6 +125,7 @@ The current Railway setup is documented in [docs/deployment/railway.md](docs/dep
 - [ARCHITECT-ENGINE.md](ARCHITECT-ENGINE.md) — project protocol, current stage, active execution lanes
 - [SPRINT-LOG.md](SPRINT-LOG.md) — session history and current sprint-level status
 - [docs/architecture/boplex-setup.md](docs/architecture/boplex-setup.md) — Bo-Plex implementation approach and worktree split
+- [docs/architecture/local-boplex-smoke.md](docs/architecture/local-boplex-smoke.md) — exact local startup and smoke-test runbook for search + voice + engine
 - [docs/deployment/railway.md](docs/deployment/railway.md) — current backend deployment path
 
 ## License

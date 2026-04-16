@@ -204,6 +204,8 @@ This is also the right bridge to the later `Harness × Runtime` vision:
 - it leaves room to swap search internals to harness-style pipelines later
 - it leaves room to replace the mock voice backend with PersonaPlex later
 
+The exact commands and smoke sequence are documented in [local-boplex-smoke.md](local-boplex-smoke.md).
+
 ## Out of scope for now
 
 - Redis-backed session coordination
