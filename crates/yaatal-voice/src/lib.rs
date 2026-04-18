@@ -1,4 +1,8 @@
+pub mod backend;
 #[cfg(feature = "edge")]
 pub mod capture;
 pub mod compress;
+pub mod contracts;
+pub mod mock;
+pub mod server;
 pub mod transcribe;
