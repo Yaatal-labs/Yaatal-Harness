@@ -8,7 +8,7 @@ use yaatal_voice::{
 };
 
 use crate::services::{
-    profile_identity::resolve_profile_id_for_user_pid,
+    profile_identity::ensure_profile_id_for_user_pid,
     search_client::{format_grounding, SearchServiceClient},
 };
 
@@ -101,7 +101,7 @@ pub async fn handle_voice_session(
     user_pid: String,
     socket: WebSocket,
 ) -> Result<(), VoiceSessionError> {
-    let profile_id = resolve_profile_id_for_user_pid(&ctx.db, &user_pid).await?;
+    let profile_id = ensure_profile_id_for_user_pid(&ctx.db, &user_pid).await?;
     let voice_service_url = std::env::var("VOICE_SERVICE_URL")
         .unwrap_or_else(|_| "ws://127.0.0.1:8082/session".to_string());
     let search_client = SearchServiceClient::from_env();
