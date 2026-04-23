@@ -12,7 +12,7 @@ This repository is a Rust workspace scaffold that now compiles with:
 cargo check --workspace --all-targets
 ```
 
-The current crates are:
+The compiled workspace members are:
 
 - `yaatal-core`: shared contracts and domain types
 - `yaatal-search`: retrieval, enrichment, reranking, and streaming search
@@ -24,7 +24,8 @@ The current crates are:
 - `yaatal-voice`: voice pipeline contracts and mock implementations
 - `yaatal-observability`: tracing helpers
 - `yaatal-evals`: evaluation scaffold
-- `yaatal-api`: temporary API stub, not the intended Engine integration boundary
+
+`yaatal-api` is still present in the repository as a temporary integration stub, but it is intentionally excluded from the compiled workspace. Harness is not the runtime/API owner.
 
 ## Integration Direction
 

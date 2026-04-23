@@ -64,6 +64,92 @@ pub struct OpenAiProvider {
     default_model: String,
 }
 
+fn serialize_openai_tool_call(tool_call: &ToolCall) -> Result<serde_json::Value, LlmError> {
+    let id = tool_call.id.clone().ok_or_else(|| {
+        LlmError::Provider(format!(
+            "OpenAI tool call '{}' is missing a provider tool call ID",
+            tool_call.name
+        ))
+    })?;
+
+    Ok(serde_json::json!({
+        "id": id,
+        "type": "function",
+        "function": {
+            "name": tool_call.name,
+            "arguments": tool_call.arguments,
+        }
+    }))
+}
+
+fn serialize_openai_message(message: &Message) -> Result<serde_json::Value, LlmError> {
+    match message.role {
+        yaatal_core::MessageRole::System => Ok(serde_json::json!({
+            "role": "system",
+            "content": message.content,
+        })),
+        yaatal_core::MessageRole::User => Ok(serde_json::json!({
+            "role": "user",
+            "content": message.content,
+        })),
+        yaatal_core::MessageRole::Assistant => {
+            let mut msg = serde_json::json!({
+                "role": "assistant",
+                "content": message.content,
+            });
+
+            if !message.tool_calls.is_empty() {
+                let tool_calls = message
+                    .tool_calls
+                    .iter()
+                    .map(serialize_openai_tool_call)
+                    .collect::<Result<Vec<_>, _>>()?;
+                msg["tool_calls"] = serde_json::Value::Array(tool_calls);
+            }
+
+            Ok(msg)
+        }
+        yaatal_core::MessageRole::ToolResult => {
+            let tool_call_id = message.tool_call_id.clone().ok_or_else(|| {
+                LlmError::Provider(
+                    "OpenAI tool result messages require a tool_call_id from the prior assistant tool call"
+                        .to_string(),
+                )
+            })?;
+
+            let mut msg = serde_json::json!({
+                "role": "tool",
+                "content": message.content,
+                "tool_call_id": tool_call_id,
+            });
+
+            if let Some(name) = &message.name {
+                msg["name"] = serde_json::json!(name);
+            }
+
+            Ok(msg)
+        }
+    }
+}
+
+fn parse_openai_tool_calls(value: &serde_json::Value) -> Vec<ToolCall> {
+    value
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .map(|tc| ToolCall {
+                    id: tc["id"].as_str().map(str::to_string),
+                    name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
+                    arguments: tc["function"]["arguments"]
+                        .as_str()
+                        .map(str::to_string)
+                        .unwrap_or_else(|| tc["function"]["arguments"].to_string()),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 impl OpenAiProvider {
     /// Create a new OpenAI provider.
     pub fn new(api_key: impl Into<String>) -> Self {
@@ -100,23 +186,8 @@ impl OpenAiProvider {
         // Convert messages to OpenAI format
         let openai_messages: Vec<serde_json::Value> = messages
             .iter()
-            .map(|m| {
-                let role = match m.role {
-                    yaatal_core::MessageRole::System => "system",
-                    yaatal_core::MessageRole::User => "user",
-                    yaatal_core::MessageRole::Assistant => "assistant",
-                    yaatal_core::MessageRole::ToolResult => "tool",
-                };
-                let mut msg = serde_json::json!({
-                    "role": role,
-                    "content": m.content,
-                });
-                if let Some(name) = &m.name {
-                    msg["name"] = serde_json::json!(name);
-                }
-                msg
-            })
-            .collect();
+            .map(serialize_openai_message)
+            .collect::<Result<Vec<_>, _>>()?;
 
         let mut body = serde_json::json!({
             "model": self.default_model,
@@ -170,17 +241,8 @@ impl OpenAiProvider {
             .unwrap_or("")
             .to_string();
 
-        let tool_calls: Vec<ToolCall> = response_body["choices"][0]["message"]["tool_calls"]
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .map(|tc| ToolCall {
-                        name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
-                        arguments: tc["function"]["arguments"].to_string(),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
+        let tool_calls =
+            parse_openai_tool_calls(&response_body["choices"][0]["message"]["tool_calls"]);
 
         let usage = response_body
             .get("usage")
@@ -763,6 +825,7 @@ impl MockProvider {
             LlmResponse {
                 content: String::new(),
                 tool_calls: vec![ToolCall {
+                    id: None,
                     name: tool_name.into(),
                     arguments: arguments.into(),
                 }],
@@ -787,6 +850,62 @@ impl MockProvider {
     pub fn reset_count(&self) {
         self.call_count
             .store(0, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn openai_tool_result_requires_tool_call_id() {
+        let err = serialize_openai_message(&Message::tool_result("search", "done"))
+            .expect_err("tool result without tool_call_id should fail");
+
+        match err {
+            LlmError::Provider(message) => assert!(message.contains("tool_call_id")),
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn openai_assistant_tool_calls_preserve_argument_string() {
+        let message = Message::assistant_with_tools(
+            "",
+            vec![ToolCall {
+                id: Some("call_123".to_string()),
+                name: "search".to_string(),
+                arguments: r#"{"query":"rust"}"#.to_string(),
+            }],
+        );
+
+        let serialized =
+            serialize_openai_message(&message).expect("assistant tool calls serialize");
+
+        assert_eq!(
+            serialized["tool_calls"][0]["function"]["arguments"].as_str(),
+            Some(r#"{"query":"rust"}"#)
+        );
+        assert_eq!(serialized["tool_calls"][0]["id"].as_str(), Some("call_123"));
+    }
+
+    #[test]
+    fn openai_tool_call_parser_keeps_arguments_raw() {
+        let parsed = parse_openai_tool_calls(&serde_json::json!([
+            {
+                "id": "call_123",
+                "type": "function",
+                "function": {
+                    "name": "search",
+                    "arguments": "{\"query\":\"rust\"}"
+                }
+            }
+        ]));
+
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].id.as_deref(), Some("call_123"));
+        assert_eq!(parsed[0].name, "search");
+        assert_eq!(parsed[0].arguments, r#"{"query":"rust"}"#);
     }
 }
 

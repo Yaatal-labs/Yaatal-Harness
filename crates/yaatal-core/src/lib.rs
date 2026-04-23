@@ -146,6 +146,10 @@ pub struct Message {
     pub content: String,
     /// Optional name field for tool messages.
     pub name: Option<String>,
+    /// Tool calls emitted by an assistant message.
+    pub tool_calls: Vec<ToolCall>,
+    /// Tool call ID associated with a tool result message.
+    pub tool_call_id: Option<String>,
     /// Optional extended thinking/reasoning content.
     /// Based on Anthropic's extended thinking pattern.
     pub thinking: Option<String>,
@@ -158,6 +162,8 @@ impl Message {
             role: MessageRole::System,
             content: content.into(),
             name: None,
+            tool_calls: vec![],
+            tool_call_id: None,
             thinking: None,
         }
     }
@@ -168,6 +174,8 @@ impl Message {
             role: MessageRole::User,
             content: content.into(),
             name: None,
+            tool_calls: vec![],
+            tool_call_id: None,
             thinking: None,
         }
     }
@@ -178,6 +186,8 @@ impl Message {
             role: MessageRole::Assistant,
             content: content.into(),
             name: None,
+            tool_calls: vec![],
+            tool_call_id: None,
             thinking: None,
         }
     }
@@ -191,7 +201,21 @@ impl Message {
             role: MessageRole::Assistant,
             content: content.into(),
             name: None,
+            tool_calls: vec![],
+            tool_call_id: None,
             thinking: Some(thinking.into()),
+        }
+    }
+
+    /// Create an assistant message that carries tool calls.
+    pub fn assistant_with_tools(content: impl Into<String>, tool_calls: Vec<ToolCall>) -> Self {
+        Self {
+            role: MessageRole::Assistant,
+            content: content.into(),
+            name: None,
+            tool_calls,
+            tool_call_id: None,
+            thinking: None,
         }
     }
 
@@ -201,6 +225,24 @@ impl Message {
             role: MessageRole::ToolResult,
             content: content.into(),
             name: Some(name.into()),
+            tool_calls: vec![],
+            tool_call_id: None,
+            thinking: None,
+        }
+    }
+
+    /// Create a tool result message tied to a prior tool call ID.
+    pub fn tool_result_for_call(
+        name: impl Into<String>,
+        tool_call_id: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
+        Self {
+            role: MessageRole::ToolResult,
+            content: content.into(),
+            name: Some(name.into()),
+            tool_calls: vec![],
+            tool_call_id: Some(tool_call_id.into()),
             thinking: None,
         }
     }
@@ -224,6 +266,8 @@ pub struct ChatParams {
 /// A tool call returned from the model.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ToolCall {
+    /// Provider-specific tool call ID, used to pair tool results with prior calls.
+    pub id: Option<String>,
     /// The name of the tool to call.
     pub name: String,
     /// The arguments as a JSON string.

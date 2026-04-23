@@ -409,14 +409,17 @@ impl IntentHandler for ResearchIntentHandler {
 
         // Use session note tool to log research
         let research_note = serde_json::json!({
-            "op": "append",
+            "operation": "write",
             "content": format!("[{}] Research started: {}", ctx.request_id, query),
         });
 
-        let _ = self
+        if let Err(error) = self
             .tools
             .execute(ctx, "session_note", &research_note.to_string())
-            .await;
+            .await
+        {
+            warn!(request_id = %ctx.request_id, %error, "research_note_write_failed");
+        }
 
         Ok(ToolResult::success(format!(
             "Research initiated for: {}. Check session notes for progress.",
@@ -449,14 +452,17 @@ impl IntentHandler for BuildIntentHandler {
 
         // Log build intent
         let build_note = serde_json::json!({
-            "op": "append",
+            "operation": "write",
             "content": format!("[{}] Build intent: {}", ctx.request_id, query),
         });
 
-        let _ = self
+        if let Err(error) = self
             .tools
             .execute(ctx, "session_note", &build_note.to_string())
-            .await;
+            .await
+        {
+            warn!(request_id = %ctx.request_id, %error, "build_note_write_failed");
+        }
 
         Ok(ToolResult::success(format!(
             "Build task queued: {}. Agent will work on this next.",

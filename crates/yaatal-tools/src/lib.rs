@@ -31,6 +31,7 @@ pub mod intent_router;
 
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 use tokio::sync::RwLock;
@@ -135,10 +136,15 @@ impl ToolExecutor {
 
     /// Register a builtin tool.
     pub async fn register_builtin(&self, tool: BuiltinTool) {
+        let workspace_dir = self.workspace_dir().await;
         let boxed: Arc<dyn Tool> = match tool {
             BuiltinTool::Shell => Arc::new(ShellTool::new()),
-            BuiltinTool::FileRead => Arc::new(FileReadTool::new()),
-            BuiltinTool::FileWrite => Arc::new(FileWriteTool::new()),
+            BuiltinTool::FileRead => {
+                Arc::new(FileReadTool::new().with_base_dir(workspace_dir.clone()))
+            }
+            BuiltinTool::FileWrite => {
+                Arc::new(FileWriteTool::new().with_base_dir(workspace_dir.clone()))
+            }
             BuiltinTool::Git => Arc::new(GitTool::new()),
             BuiltinTool::WebFetch => Arc::new(WebFetchTool::new()),
             BuiltinTool::Search => Arc::new(SearchTool::new()),
@@ -273,6 +279,63 @@ pub enum BuiltinTool {
     SessionNote,
 }
 
+fn canonicalize_path(path: &Path) -> Result<PathBuf, ToolError> {
+    std::fs::canonicalize(path).map_err(|e| ToolError::ExecutionFailed(e.to_string()))
+}
+
+fn workspace_root(base_dir: &Option<String>) -> Result<PathBuf, ToolError> {
+    let base = if let Some(base_dir) = base_dir {
+        PathBuf::from(base_dir)
+    } else {
+        std::env::current_dir().map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+    };
+
+    canonicalize_path(&base)
+}
+
+fn ensure_within_workspace(workspace: &Path, candidate: &Path) -> Result<(), ToolError> {
+    if candidate.starts_with(workspace) {
+        Ok(())
+    } else {
+        Err(ToolError::PermissionDenied(format!(
+            "Path '{}' is outside workspace '{}'",
+            candidate.display(),
+            workspace.display()
+        )))
+    }
+}
+
+fn resolve_scoped_path(
+    base_dir: &Option<String>,
+    path: &str,
+    allow_missing_leaf: bool,
+) -> Result<PathBuf, ToolError> {
+    let workspace = workspace_root(base_dir)?;
+    let candidate = if Path::new(path).is_absolute() {
+        PathBuf::from(path)
+    } else {
+        workspace.join(path)
+    };
+
+    if allow_missing_leaf {
+        let parent = candidate.parent().ok_or_else(|| {
+            ToolError::InvalidParams(format!("Invalid writable path '{}'", candidate.display()))
+        })?;
+        let canonical_parent = canonicalize_path(parent)?;
+        ensure_within_workspace(&workspace, &canonical_parent)?;
+
+        let file_name = candidate.file_name().ok_or_else(|| {
+            ToolError::InvalidParams(format!("Invalid writable path '{}'", candidate.display()))
+        })?;
+
+        Ok(canonical_parent.join(file_name))
+    } else {
+        let canonical_candidate = canonicalize_path(&candidate)?;
+        ensure_within_workspace(&workspace, &canonical_candidate)?;
+        Ok(canonical_candidate)
+    }
+}
+
 /// Shell command execution tool.
 pub struct ShellTool;
 
@@ -363,19 +426,8 @@ impl FileReadTool {
         self
     }
 
-    fn resolve_path(&self, path: &str) -> String {
-        if std::path::Path::new(path).is_absolute() {
-            path.to_string()
-        } else if let Some(base) = &self.base_dir {
-            std::path::Path::new(base)
-                .join(path)
-                .to_string_lossy()
-                .to_string()
-        } else {
-            std::env::current_dir()
-                .map(|p| p.join(path).to_string_lossy().to_string())
-                .unwrap_or_else(|_| path.to_string())
-        }
+    fn resolve_path(&self, path: &str) -> Result<PathBuf, ToolError> {
+        resolve_scoped_path(&self.base_dir, path, false)
     }
 }
 
@@ -420,16 +472,9 @@ impl Tool for FileReadTool {
             serde_json::from_str(arguments).map_err(|e| ToolError::InvalidParams(e.to_string()))?;
 
         // Resolve path to absolute (ACI principle: prevent path confusion)
-        let resolved_path = self.resolve_path(&args.path);
+        let resolved_path = self.resolve_path(&args.path)?;
 
-        tracing::info!(file_path = %resolved_path, request_id = %ctx.request_id);
-
-        // Security check - prevent path traversal
-        if resolved_path.contains("..") {
-            return Err(ToolError::PermissionDenied(
-                "Path traversal not allowed".to_string(),
-            ));
-        }
+        tracing::info!(file_path = %resolved_path.display(), request_id = %ctx.request_id);
 
         let content = tokio::fs::read_to_string(&resolved_path)
             .await
@@ -459,19 +504,8 @@ impl FileWriteTool {
         self
     }
 
-    fn resolve_path(&self, path: &str) -> String {
-        if std::path::Path::new(path).is_absolute() {
-            path.to_string()
-        } else if let Some(base) = &self.base_dir {
-            std::path::Path::new(base)
-                .join(path)
-                .to_string_lossy()
-                .to_string()
-        } else {
-            std::env::current_dir()
-                .map(|p| p.join(path).to_string_lossy().to_string())
-                .unwrap_or_else(|_| path.to_string())
-        }
+    fn resolve_path(&self, path: &str) -> Result<PathBuf, ToolError> {
+        resolve_scoped_path(&self.base_dir, path, true)
     }
 }
 
@@ -512,16 +546,9 @@ impl Tool for FileWriteTool {
             serde_json::from_str(arguments).map_err(|e| ToolError::InvalidParams(e.to_string()))?;
 
         // Resolve path to absolute (ACI principle: prevent path confusion)
-        let resolved_path = self.resolve_path(&args.path);
+        let resolved_path = self.resolve_path(&args.path)?;
 
-        tracing::info!(file_path = %resolved_path, request_id = %ctx.request_id);
-
-        // Security check - prevent path traversal
-        if resolved_path.contains("..") {
-            return Err(ToolError::PermissionDenied(
-                "Path traversal not allowed".to_string(),
-            ));
-        }
+        tracing::info!(file_path = %resolved_path.display(), request_id = %ctx.request_id);
 
         tokio::fs::write(&resolved_path, &args.content)
             .await
@@ -530,7 +557,7 @@ impl Tool for FileWriteTool {
         Ok(ToolResult::success(format!(
             "Written {} bytes to {}",
             args.content.len(),
-            resolved_path
+            resolved_path.display()
         )))
     }
 }
@@ -938,6 +965,8 @@ impl ToolCallParser {
     pub fn parse_tool_calls(json_str: &str) -> Result<Vec<yaatal_core::ToolCall>, ToolError> {
         #[derive(serde::Deserialize)]
         struct ToolCall {
+            #[serde(default)]
+            id: Option<String>,
             name: String,
             arguments: serde_json::Value,
         }
@@ -954,6 +983,7 @@ impl ToolCallParser {
             .into_iter()
             .map(|tc| {
                 Ok(yaatal_core::ToolCall {
+                    id: tc.id,
                     name: tc.name,
                     arguments: serde_json::to_string(&tc.arguments)
                         .map_err(|e| ToolError::InvalidParams(e.to_string()))?,
@@ -980,6 +1010,10 @@ impl ToolCallParser {
                     if let Some(name) = parsed.get("name").and_then(|v| v.as_str()) {
                         if let Some(args) = parsed.get("arguments") {
                             calls.push(yaatal_core::ToolCall {
+                                id: parsed
+                                    .get("id")
+                                    .and_then(|v| v.as_str())
+                                    .map(str::to_string),
                                 name: name.to_string(),
                                 arguments: serde_json::to_string(args).unwrap_or_default(),
                             });
@@ -990,5 +1024,38 @@ impl ToolCallParser {
         }
 
         calls
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use yaatal_core::Tool;
+
+    #[tokio::test]
+    async fn file_read_rejects_paths_outside_workspace() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("yaatal-tools-{unique}"));
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace).unwrap();
+
+        let outside = root.join("outside.txt");
+        std::fs::write(&outside, "secret").unwrap();
+
+        let tool = FileReadTool::new().with_base_dir(workspace.to_string_lossy().to_string());
+        let ctx = RequestContext::new("test");
+        let arguments = serde_json::json!({
+            "path": outside.to_string_lossy().to_string()
+        });
+
+        let result = tool.execute(&ctx, &arguments.to_string()).await;
+
+        assert!(matches!(result, Err(ToolError::PermissionDenied(_))));
+
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

@@ -80,7 +80,7 @@ impl Default for SpeakerDatabase {
 /// Speaker-aware policy that checks speaker authorization.
 pub struct SpeakerAwarePolicy {
     inner: Arc<dyn PolicyEngine>,
-    _speaker_db: Arc<SpeakerDatabase>,
+    speaker_db: Arc<SpeakerDatabase>,
     allowed_speakers: HashMap<String, bool>,
     default_allow: bool,
 }
@@ -96,7 +96,7 @@ impl SpeakerAwarePolicy {
 
         Self {
             inner,
-            _speaker_db: speaker_db,
+            speaker_db,
             allowed_speakers: allowed,
             default_allow: false,
         }
@@ -125,6 +125,51 @@ impl SpeakerAwarePolicy {
     pub fn remove_allowed_speaker(&mut self, speaker_id: &str) {
         self.allowed_speakers.insert(speaker_id.to_string(), false);
     }
+
+    fn resolve_verified_speaker(&self, ctx: &RequestContext) -> Result<Option<String>, String> {
+        let claimed_speaker = ctx.metadata.get("speaker_id").cloned();
+        let verified_claim = ctx
+            .metadata
+            .get("speaker_verified")
+            .map(|value| matches!(value.to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
+            .unwrap_or(false);
+
+        if verified_claim {
+            let speaker = claimed_speaker.ok_or_else(|| {
+                "speaker_verified was set but no speaker_id was provided".to_string()
+            })?;
+
+            if !self.speaker_db.is_registered(&speaker) {
+                return Err(format!("Verified speaker '{}' is not registered", speaker));
+            }
+
+            return Ok(Some(speaker));
+        }
+
+        if let Some(raw_embedding) = ctx.metadata.get("speaker_embedding") {
+            let embedding = parse_embedding(raw_embedding)?;
+            let identified = self.speaker_db.identify(&embedding).ok_or_else(|| {
+                "Speaker embedding did not match a registered speaker".to_string()
+            })?;
+
+            if let Some(claimed) = claimed_speaker {
+                if claimed != identified {
+                    return Err(format!(
+                        "Speaker claim '{}' did not match verified embedding '{}'",
+                        claimed, identified
+                    ));
+                }
+            }
+
+            return Ok(Some(identified));
+        }
+
+        if let Some(speaker) = claimed_speaker {
+            return Err(format!("Speaker '{}' claim was not verified", speaker));
+        }
+
+        Ok(None)
+    }
 }
 
 #[async_trait]
@@ -134,36 +179,41 @@ impl PolicyEngine for SpeakerAwarePolicy {
         ctx: &RequestContext,
         items: Vec<ScoredCandidate>,
     ) -> Result<PolicyResult, HarnessError> {
-        // Check for speaker_id in context metadata
-        let speaker_id = ctx.metadata.get("speaker_id");
-
-        if let Some(speaker) = speaker_id {
-            if !self.is_allowed_speaker(speaker) {
-                warn!(speaker = %speaker, request_id = %ctx.request_id, "speaker_not_authorized");
-                return Ok(PolicyResult {
-                    allowed: vec![],
-                    denied: items
-                        .into_iter()
-                        .map(|sc| (sc, format!("Speaker '{}' not authorized", speaker)))
-                        .collect(),
-                });
+        match self.resolve_verified_speaker(ctx) {
+            Ok(Some(speaker)) => {
+                if !self.is_allowed_speaker(&speaker) {
+                    warn!(speaker = %speaker, request_id = %ctx.request_id, "speaker_not_authorized");
+                    return Ok(PolicyResult {
+                        allowed: vec![],
+                        denied: items
+                            .into_iter()
+                            .map(|sc| (sc, format!("Speaker '{}' not authorized", speaker)))
+                            .collect(),
+                    });
+                }
+                info!(speaker = %speaker, request_id = %ctx.request_id, "speaker_authorized");
             }
-            info!(speaker = %speaker, request_id = %ctx.request_id, "speaker_authorized");
-        } else {
-            // No speaker identified - check if we allow anonymous
-            if !self.default_allow {
-                warn!(request_id = %ctx.request_id, "no_speaker_identified");
+            Ok(None) => {
+                if !self.default_allow {
+                    warn!(request_id = %ctx.request_id, "no_speaker_identified");
+                    return Ok(PolicyResult {
+                        allowed: vec![],
+                        denied: items
+                            .into_iter()
+                            .map(|sc| (sc, "No speaker identified".to_string()))
+                            .collect(),
+                    });
+                }
+            }
+            Err(reason) => {
+                warn!(request_id = %ctx.request_id, reason = %reason, "speaker_verification_failed");
                 return Ok(PolicyResult {
                     allowed: vec![],
-                    denied: items
-                        .into_iter()
-                        .map(|sc| (sc, "No speaker identified".to_string()))
-                        .collect(),
+                    denied: items.into_iter().map(|sc| (sc, reason.clone())).collect(),
                 });
             }
         }
 
-        // Delegate to inner policy
         self.inner.evaluate(ctx, items).await
     }
 }
@@ -187,6 +237,30 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     }
 
     dot_product / (magnitude_a * magnitude_b)
+}
+
+fn parse_embedding(raw: &str) -> Result<Vec<f32>, String> {
+    let trimmed = raw.trim().trim_start_matches('[').trim_end_matches(']');
+
+    if trimmed.is_empty() {
+        return Err("Speaker embedding was empty".to_string());
+    }
+
+    let embedding = trimmed
+        .split(',')
+        .map(|value| {
+            value
+                .trim()
+                .parse::<f32>()
+                .map_err(|_| format!("Invalid embedding value '{}'", value.trim()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if embedding.is_empty() {
+        return Err("Speaker embedding was empty".to_string());
+    }
+
+    Ok(embedding)
 }
 
 /// Create an embedding from audio samples (placeholder).
@@ -249,7 +323,9 @@ mod tests {
     #[test]
     fn test_speaker_aware_policy_allowed() {
         let inner = Arc::new(AllowAllPolicy);
-        let db = Arc::new(SpeakerDatabase::new());
+        let mut db = SpeakerDatabase::new();
+        db.register("user1", vec![1.0, 0.0, 0.0]);
+        let db = Arc::new(db);
         let policy = SpeakerAwarePolicy::new(inner, db, vec!["user1".to_string()]);
 
         let ctx = RequestContext::new("test");
@@ -257,6 +333,9 @@ mod tests {
         ctx_with_speaker
             .metadata
             .insert("speaker_id".to_string(), "user1".to_string());
+        ctx_with_speaker
+            .metadata
+            .insert("speaker_verified".to_string(), "true".to_string());
 
         let items = vec![yaatal_core::ScoredCandidate {
             candidate: yaatal_core::Candidate {
@@ -278,12 +357,16 @@ mod tests {
     #[test]
     fn test_speaker_aware_policy_denied() {
         let inner = Arc::new(AllowAllPolicy);
-        let db = Arc::new(SpeakerDatabase::new());
+        let mut db = SpeakerDatabase::new();
+        db.register("user1", vec![1.0, 0.0, 0.0]);
+        let db = Arc::new(db);
         let policy = SpeakerAwarePolicy::new(inner, db, vec!["user1".to_string()]);
 
         let mut ctx = RequestContext::new("test");
         ctx.metadata
             .insert("speaker_id".to_string(), "unauthorized".to_string());
+        ctx.metadata
+            .insert("speaker_verified".to_string(), "true".to_string());
 
         let items = vec![yaatal_core::ScoredCandidate {
             candidate: yaatal_core::Candidate {
@@ -326,5 +409,36 @@ mod tests {
         assert!(result.is_ok());
         let policy_result = result.unwrap();
         assert_eq!(policy_result.allowed.len(), 1);
+    }
+
+    #[test]
+    fn test_unverified_speaker_claim_is_denied() {
+        let inner = Arc::new(AllowAllPolicy);
+        let mut db = SpeakerDatabase::new();
+        db.register("user1", vec![1.0, 0.0, 0.0]);
+        let db = Arc::new(db);
+        let policy = SpeakerAwarePolicy::new(inner, db, vec!["user1".to_string()]);
+
+        let mut ctx = RequestContext::new("test");
+        ctx.metadata
+            .insert("speaker_id".to_string(), "user1".to_string());
+
+        let items = vec![yaatal_core::ScoredCandidate {
+            candidate: yaatal_core::Candidate {
+                id: "doc1".to_string(),
+                attributes: HashMap::new(),
+            },
+            score: 0.9,
+            metadata: None,
+        }];
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(policy.evaluate(&ctx, items));
+
+        assert!(result.is_ok());
+        let policy_result = result.unwrap();
+        assert_eq!(policy_result.allowed.len(), 0);
+        assert_eq!(policy_result.denied.len(), 1);
+        assert!(policy_result.denied[0].1.contains("not verified"));
     }
 }
