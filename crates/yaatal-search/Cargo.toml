@@ -1,0 +1,23 @@
+[package]
+name = "yaatal-search"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yaatal-core = { path = "../yaatal-core" }
+yaatal-models = { path = "../yaatal-models" }
+yaatal-policy = { path = "../yaatal-policy" }
+yaatal-tools = { path = "../yaatal-tools" }
+yaatal-memory = { path = "../yaatal-memory" }
+async-trait = { workspace = true }
+async-stream = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+pin-project = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"

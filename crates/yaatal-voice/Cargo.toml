@@ -1,0 +1,19 @@
+[package]
+name = "yaatal-voice"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yaatal-core = { path = "../yaatal-core" }
+yaatal-models = { path = "../yaatal-models" }
+yaatal-policy = { path = "../yaatal-policy" }
+yaatal-search = { path = "../yaatal-search" }
+async-trait = { workspace = true }
+futures = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
