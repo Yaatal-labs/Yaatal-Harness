@@ -10,7 +10,7 @@ use sea_orm::{ActiveValue::Set, EntityTrait};
 use serde_json::Value;
 use sha2::Sha256;
 use uuid::Uuid;
-use chrono::Utc;
+use chrono::Utc as ChronoUtc;
 
 use yaatal_core::models::post;
 
@@ -81,11 +81,9 @@ async fn insert_post(
     content: &str,
     post_type: &str,
     category: Option<&str>,
-    image_url: Option<&str>,
     author_id: &str,
-    is_featured: bool,
 ) -> bool {
-    let now = Utc::now().naive_utc().to_string();
+    let now = ChronoUtc::now().to_rfc3339();
     let model = post::ActiveModel {
         id:            Set(Uuid::new_v4().to_string()),
         author_id:     Set(author_id.to_string()),
@@ -99,8 +97,6 @@ async fn insert_post(
         is_pinned:     Set(0),
         created_at:    Set(now.clone()),
         updated_at:    Set(now),
-        image_url:     Set(image_url.map(|s| s.to_string())),
-        is_featured:   Set(i32::from(is_featured)),
         ..Default::default()
     };
     post::Entity::insert(model).exec(db).await.is_ok()
@@ -126,10 +122,9 @@ async fn handle_rss_feed(body: &Value, db: &sea_orm::DatabaseConnection, bot_id:
         let content = sanitize(&truncate(&content, 5000));
         if title.is_empty() || content.is_empty() { continue; }
 
-        let category  = item.get("category").and_then(|v| v.as_str());
-        let image_url = item.get("image_url").and_then(|v| v.as_str());
+        let category = item.get("category").and_then(|v| v.as_str());
 
-        if insert_post(db, &title, &content, "discussion", category, image_url, bot_id, false).await {
+        if insert_post(db, &title, &content, "discussion", category, bot_id).await {
             inserted += 1;
         }
     }
@@ -154,8 +149,7 @@ async fn handle_github_trending(body: &Value, db: &sea_orm::DatabaseConnection, 
             "Trending Repository\n\n**{name}**\n\n{desc}\n\nStars: {stars}"
         ));
 
-        let url = repo.get("url").and_then(|v| v.as_str());
-        if insert_post(db, &title, &content, "showcase", Some("devtools"), None, bot_id, stars > 1000).await {
+        if insert_post(db, &title, &content, "showcase", Some("devtools"), bot_id).await {
             inserted += 1;
         }
     }
@@ -179,12 +173,10 @@ async fn handle_devto_sync(body: &Value, db: &sea_orm::DatabaseConnection, bot_i
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .chars().take(500).collect::<String>();
-        let image_url = article.get("cover_image").and_then(|v| v.as_str());
-
         let title   = sanitize(&truncate(title, 500));
         let content = sanitize(&content_raw);
 
-        if insert_post(db, &title, &content, "tutorial", Some("edtech"), image_url, bot_id, reactions > 50).await {
+        if insert_post(db, &title, &content, "tutorial", Some("edtech"), bot_id).await {
             inserted += 1;
         }
     }
@@ -200,10 +192,9 @@ async fn handle_content_post(body: &Value, db: &sea_orm::DatabaseConnection, bot
     }
     let title   = sanitize(&truncate(&title, 500));
     let content = sanitize(&truncate(&content, 5000));
-    let category  = body.get("category").and_then(|v| v.as_str());
-    let image_url = body.get("image_url").and_then(|v| v.as_str());
+    let category = body.get("category").and_then(|v| v.as_str());
 
-    if insert_post(db, &title, &content, "discussion", category, image_url, bot_id, false).await {
+    if insert_post(db, &title, &content, "discussion", category, bot_id).await {
         (StatusCode::OK, serde_json::json!({"success": true}))
     } else {
         (StatusCode::INTERNAL_SERVER_ERROR, serde_json::json!({"error": "Failed to create post"}))
