@@ -1,0 +1,12 @@
+[package]
+name = "yaatal-feed"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+yaatal-core = { path = "../yaatal-core" }
+yaatal-models = { path = "../yaatal-models" }
+yaatal-policy = { path = "../yaatal-policy" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde_json = { workspace = true }
