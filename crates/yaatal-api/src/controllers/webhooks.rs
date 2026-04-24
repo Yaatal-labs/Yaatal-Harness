@@ -1,21 +1,24 @@
 use axum::{
     body::Bytes,
-    extract::{Request, State},
+    extract::State,
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
 };
+use hmac::{Hmac, Mac};
 use loco_rs::prelude::*;
 use sea_orm::{ActiveValue::Set, EntityTrait};
-use serde::Deserialize;
 use serde_json::Value;
+use sha2::Sha256;
 use uuid::Uuid;
 use chrono::Utc;
 
 use yaatal_core::models::post;
 
+type HmacSha256 = Hmac<Sha256>;
+
 // ── Signature verification ────────────────────────────────────────────────────
 
-/// Constant-time byte comparison to prevent timing attacks on the secret.
+/// Constant-time byte comparison to prevent timing attacks.
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
@@ -23,12 +26,22 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     a.iter().zip(b.iter()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-fn verify_signature(headers: &HeaderMap, secret: &str) -> bool {
+/// Verifies x-n8n-signature header against HMAC-SHA256(secret, body).
+/// Matches the Node implementation: createHmac('sha256', secret).update(body).digest('hex')
+fn verify_signature(headers: &HeaderMap, body: &[u8], secret: &str) -> bool {
     let sig = match headers.get("x-n8n-signature").and_then(|v| v.to_str().ok()) {
         Some(s) => s,
         None => return false,
     };
-    constant_time_eq(sig.as_bytes(), secret.as_bytes())
+
+    let mut mac = match HmacSha256::new_from_slice(secret.as_bytes()) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    mac.update(body);
+    let expected = hex::encode(mac.finalize().into_bytes());
+
+    constant_time_eq(sig.as_bytes(), expected.as_bytes())
 }
 
 // ── Content sanitization ──────────────────────────────────────────────────────
@@ -216,7 +229,7 @@ pub async fn n8n(
         }
     };
 
-    if !verify_signature(&headers, &secret) {
+    if !verify_signature(&headers, &body, &secret) {
         tracing::warn!("n8n webhook: signature verification failed");
         return (StatusCode::UNAUTHORIZED, "Invalid webhook signature").into_response();
     }

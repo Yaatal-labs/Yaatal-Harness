@@ -26,6 +26,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = "1.11"
 reqwest = { workspace = true }
 jsonwebtoken = "9.3"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
 futures-util = "0.3"
 thiserror = "2"
 migration = { path = "migration" }
