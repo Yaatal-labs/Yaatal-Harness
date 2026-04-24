@@ -167,7 +167,7 @@ async fn handle_devto_sync(body: &Value, db: &sea_orm::DatabaseConnection, bot_i
         let title = article.get("title").and_then(|v| v.as_str()).unwrap_or("");
         if title.is_empty() { continue; }
 
-        let reactions = article.get("positive_reactions_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let _reactions = article.get("positive_reactions_count").and_then(|v| v.as_i64()).unwrap_or(0);
         let content_raw = article.get("description")
             .or_else(|| article.get("body_markdown"))
             .and_then(|v| v.as_str())

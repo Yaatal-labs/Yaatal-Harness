@@ -1,7 +1,7 @@
 use axum::{body::Body, extract::State, http::StatusCode, response::Response};
 use futures_util::StreamExt;
 use loco_rs::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::json;
 
 #[derive(Deserialize)]
