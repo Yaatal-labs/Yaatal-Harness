@@ -11,6 +11,18 @@ server:
   binding: 0.0.0.0
   host: {{ get_env(name="APP_URL", default="http://localhost:8080") }}
   middlewares:
+    cors:
+      enable: true
+      allow_origins: any
+      allow_headers:
+        - Content-Type
+        - Authorization
+      allow_methods:
+        - GET
+        - POST
+        - PUT
+        - OPTIONS
+      max_age: 3600
 
 workers:
   mode: BackgroundAsync

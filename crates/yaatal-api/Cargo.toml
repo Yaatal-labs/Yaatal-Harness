@@ -13,6 +13,7 @@ workspace = true
 [dependencies]
 yaatal-core = { path = "../yaatal-core" }
 yaatal-feed = { path = "../yaatal-feed" }
+yaatal-search = { path = "../yaatal-search" }
 yaatal-voice = { path = "../yaatal-voice" }
 loco-rs = { version = "0.16" }
 serde = { workspace = true }
@@ -23,6 +24,13 @@ axum = "0.8"
 tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 regex = "1.11"
+reqwest = { workspace = true }
+jsonwebtoken = "9.3"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+futures-util = "0.3"
+thiserror = "2"
 migration = { path = "migration" }
 sea-orm = { version = "1.1", features = [
   "sqlx-sqlite",

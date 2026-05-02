@@ -62,7 +62,7 @@ pub struct SearchHit {
     pub metadata: Map<String, Value>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SearchResponse {
     pub hits: Vec<SearchHit>,
 }
@@ -74,12 +74,12 @@ pub struct IndexUpsertRequest {
     pub reset: bool,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IndexUpsertResponse {
     pub indexed: usize,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HealthResponse {
     pub status: &'static str,
 }

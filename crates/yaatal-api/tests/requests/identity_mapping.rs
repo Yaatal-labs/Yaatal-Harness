@@ -4,6 +4,7 @@ use serial_test::serial;
 use yaatal_api::{
     app::App,
     models::users::{self, RegisterParams},
+    services::profile_identity,
     views::{auth::LoginResponse, comments::CommentResponse, posts::PostResponse},
 };
 use yaatal_core::{
@@ -186,6 +187,35 @@ async fn create_post_without_linked_profile_returns_not_found() {
             }))
             .await;
         assert_eq!(create_post_response.status_code(), 404);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[serial]
+async fn ensure_profile_backfills_legacy_user() {
+    request::<App, _, _>(|_request, ctx| async move {
+        let params = RegisterParams {
+            name: "voice legacy".to_string(),
+            email: "voice-legacy@loco.com".to_string(),
+            password: "12341234".to_string(),
+        };
+        let user = users::Model::create_with_password(&ctx.db, &params)
+            .await
+            .expect("expected user creation");
+
+        let profile_id =
+            profile_identity::ensure_profile_id_for_user_pid(&ctx.db, &user.pid.to_string())
+                .await
+                .expect("expected legacy profile backfill");
+
+        let linked = linked_profile_by_user_pid(&ctx, &user.pid.to_string()).await;
+        let user_pid = user.pid.to_string();
+        assert_eq!(profile_id, linked.id);
+        assert_eq!(linked.user_id.as_deref(), Some(user_pid.as_str()));
+        assert_eq!(linked.display_name.as_deref(), Some("voice legacy"));
+        assert_eq!(linked.xp, 0);
+        assert_eq!(linked.level, 1);
     })
     .await;
 }

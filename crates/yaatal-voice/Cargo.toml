@@ -27,8 +27,8 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 async-trait = "0.1"
 axum = { version = "0.8", features = ["ws"] }
 futures-util = "0.3"
+tokio-tungstenite = "0.28"
 thiserror = "2"
 
 [dev-dependencies]
 pretty_assertions.workspace = true
-tokio-tungstenite = "0.28"
