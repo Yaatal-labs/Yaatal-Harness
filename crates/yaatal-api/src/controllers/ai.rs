@@ -16,22 +16,23 @@ pub struct ChatRequest {
     pub model: Option<String>,
 }
 
-/// POST /api/ai/chat — proxy Groq streaming to the client.
+/// POST /api/ai/chat — proxy Ollama streaming to the client.
 ///
 /// Requires Authorization: Bearer <supabase_jwt>. Returns text/event-stream
-/// forwarded directly from Groq, so the client can consume standard SSE.
+/// forwarded directly from Ollama, so the client can consume standard SSE.
+/// Reads OLLAMA_BASE_URL (default: http://localhost:11434).
 pub async fn chat(
     auth: auth::JWT,
     State(_ctx): State<AppContext>,
     Json(req): Json<ChatRequest>,
 ) -> Result<Response> {
-    let groq_key = std::env::var("GROQ_API_KEY")
-        .map_err(|_| loco_rs::Error::string("GROQ_API_KEY not configured"))?;
+    let base_url = std::env::var("OLLAMA_BASE_URL")
+        .unwrap_or_else(|_| "http://localhost:11434".to_string());
 
     let model = req
         .model
         .as_deref()
-        .unwrap_or("qwen/qwen-3-70b-preview")
+        .unwrap_or("qwen3:8b")
         .to_string();
 
     let messages: Vec<serde_json::Value> = req
@@ -44,29 +45,27 @@ pub async fn chat(
         "model": model,
         "messages": messages,
         "stream": true,
-        "max_tokens": 1024,
     });
 
     let client = reqwest::Client::new();
-    let groq_resp = client
-        .post("https://api.groq.com/openai/v1/chat/completions")
-        .header("Authorization", format!("Bearer {groq_key}"))
+    let ollama_resp = client
+        .post(format!("{base_url}/v1/chat/completions"))
         .header("Content-Type", "application/json")
         .json(&body)
         .send()
         .await
-        .map_err(|e| loco_rs::Error::string(&format!("Groq request failed: {e}")))?;
+        .map_err(|e| loco_rs::Error::string(&format!("Ollama request failed: {e}")))?;
 
-    if !groq_resp.status().is_success() {
-        let status = groq_resp.status().as_u16();
+    if !ollama_resp.status().is_success() {
+        let status = ollama_resp.status().as_u16();
         return Ok(Response::builder()
             .status(StatusCode::BAD_GATEWAY)
-            .body(Body::from(format!("Groq error: {status}")))
+            .body(Body::from(format!("Ollama error: {status}")))
             .unwrap());
     }
 
-    // Forward Groq's SSE stream directly — zero copy, no buffering.
-    let byte_stream = groq_resp
+    // Forward Ollama's SSE stream directly — zero copy, no buffering.
+    let byte_stream = ollama_resp
         .bytes_stream()
         .map(|r| r.map_err(|e| format!("stream error: {e}")));
 
