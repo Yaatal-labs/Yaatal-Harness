@@ -55,7 +55,7 @@ The current deployed API still only requires:
 
 Prepare these as the session loop lands:
 
-- `PERSONAPLEX_WS_URL`
+- `VOICE_SERVICE_URL`
 - `PERSONAPLEX_BEARER_TOKEN`
 - `PERSONAPLEX_DEFAULT_PERSONA`
 - `PERSONAPLEX_DEFAULT_LANG`
