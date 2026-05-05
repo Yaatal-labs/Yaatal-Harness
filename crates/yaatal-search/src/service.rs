@@ -83,21 +83,32 @@ where
             .await
             .map_err(|err| SearchError::Index(err.to_string()))?;
 
-        let ids: Vec<String> = ranked.iter().map(|hit| hit.id.clone()).collect();
-        let hydrated = self
-            .documents
-            .fetch_documents(&ids)
-            .await
-            .map_err(|err| SearchError::Store(err.to_string()))?;
-
         let mut by_id = std::collections::HashMap::new();
-        for doc in hydrated {
-            by_id.insert(doc.id.clone(), doc);
+        let missing_ids: Vec<String> = ranked
+            .iter()
+            .filter(|hit| hit.record.is_none())
+            .map(|hit| hit.id.clone())
+            .collect();
+        if !missing_ids.is_empty() {
+            let hydrated = self
+                .documents
+                .fetch_documents(&missing_ids)
+                .await
+                .map_err(|err| SearchError::Store(err.to_string()))?;
+            for doc in hydrated {
+                by_id.insert(doc.id.clone(), doc);
+            }
         }
 
         let hits = ranked
             .into_iter()
-            .filter_map(|ranked_hit| by_id.get(&ranked_hit.id).map(|record| (ranked_hit, record)))
+            .filter_map(|mut ranked_hit| {
+                let record = ranked_hit
+                    .record
+                    .take()
+                    .or_else(|| by_id.remove(&ranked_hit.id))?;
+                Some((ranked_hit, record))
+            })
             .map(|(ranked_hit, record)| SearchHit {
                 id: record.id.clone(),
                 text: record.text.clone(),

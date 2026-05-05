@@ -6,7 +6,7 @@ Current hosted shape:
 
 - Railway: `yaatal-api`
 - Railway: Postgres
-- External service: PersonaPlex (local mock first, RunPod later)
+- External service: voice websocket (local mock first, RunPod later)
 - External service: `/search` HTTP endpoint
 
 ## One-command bootstrap
@@ -51,19 +51,23 @@ The current deployed API still only requires:
 - `DATABASE_URL`
 - `JWT_SECRET`
 
-## Planned Bo-Plex variables
+## Bo-Plex variables
 
-Prepare these as the session loop lands:
+Current Engine-side variables:
 
 - `VOICE_SERVICE_URL`
-- `PERSONAPLEX_BEARER_TOKEN`
-- `PERSONAPLEX_DEFAULT_PERSONA`
-- `PERSONAPLEX_DEFAULT_LANG`
-- `PERSONAPLEX_DEFAULT_MARKET`
 - `SEARCH_SERVICE_URL`
 - `SEARCH_SERVICE_TIMEOUT_SECONDS`
 
-These are not all wired in code yet. They are the documented runtime shape for the Bo-Plex rollout.
+Current search-service variables when `/search` runs with the external backend:
+
+- `SEARCH_BACKEND=external`
+- `BGE_M3_URL`
+- `QDRANT_URL`
+- `QDRANT_COLLECTION`
+- `QDRANT_API_KEY` (optional)
+
+The first external slice hydrates directly from Qdrant payloads. Postgres remains optional follow-on work, not a prerequisite for the search service to start.
 
 ## Verification
 

@@ -12,7 +12,8 @@ pub enum SearchBackendConfig {
     External {
         bge_m3_url: String,
         qdrant_url: String,
-        database_url: String,
+        qdrant_collection: String,
+        qdrant_api_key: Option<String>,
     },
 }
 
@@ -45,11 +46,16 @@ impl SearchServiceConfig {
             "external" => {
                 let bge_m3_url = env::var("BGE_M3_URL").unwrap_or_default();
                 let qdrant_url = env::var("QDRANT_URL").unwrap_or_default();
-                let database_url = env::var("SEARCH_DATABASE_URL").unwrap_or_default();
+                let qdrant_collection =
+                    env::var("QDRANT_COLLECTION").unwrap_or_else(|_| "yaatal-search".to_string());
+                let qdrant_api_key = env::var("QDRANT_API_KEY")
+                    .ok()
+                    .filter(|value| !value.trim().is_empty());
                 config.backend = SearchBackendConfig::External {
                     bge_m3_url,
                     qdrant_url,
-                    database_url,
+                    qdrant_collection,
+                    qdrant_api_key,
                 };
             }
             _ => {

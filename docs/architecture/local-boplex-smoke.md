@@ -58,6 +58,37 @@ $env:SEARCH_BACKEND = "in-memory"
 cargo run -p yaatal-search --bin search_service
 ```
 
+External backend variant:
+
+```powershell
+$env:SEARCH_BIND = "127.0.0.1:8081"
+$env:SEARCH_BACKEND = "external"
+$env:BGE_M3_URL = "http://127.0.0.1:8090"
+$env:QDRANT_URL = "http://127.0.0.1:6333"
+$env:QDRANT_COLLECTION = "yaatal-search"
+cargo run -p yaatal-search --bin search_service
+```
+
+Fastest local helper:
+
+```powershell
+.\scripts\start-local-search-stack.ps1
+```
+
+That helper:
+
+- starts or reuses a local Qdrant Docker container on `127.0.0.1:6333`
+- launches the deterministic `mock_embedder` binary on `127.0.0.1:8090`
+- runs `search_service` with `SEARCH_BACKEND=external`
+
+If Docker Desktop is unavailable, use:
+
+```powershell
+.\scripts\start-local-search-stack.ps1 -UseMockQdrant
+```
+
+That keeps the same external HTTP shape but swaps Qdrant for the local mock binary.
+
 Expected behavior:
 
 - the service binds on `127.0.0.1:8081`
@@ -103,6 +134,7 @@ Run:
 $env:SEARCH_SERVICE_URL = "http://127.0.0.1:8081"
 $env:VOICE_SERVICE_URL = "ws://127.0.0.1:8082/session"
 $env:JWT_SECRET = "yaatal-dev-secret-change-in-production"
+$env:VOICE_ROUTING_DEBUG_MESSAGES = "true"
 cargo run -p yaatal-api --bin yaatal_api-cli -- start
 ```
 
@@ -222,6 +254,26 @@ Depending on the mock/search state, you may also see:
 - `warning` if search is unavailable
 - extra downstream messages if the voice service emits them
 
+Reusable helper:
+
+```powershell
+python .\scripts\run-local-boplex-smoke.py --transcript "find white fabric near Sandaga"
+```
+
+Helpful options:
+
+```powershell
+python .\scripts\run-local-boplex-smoke.py `
+  --base-url "http://localhost:5150" `
+  --ws-url "ws://localhost:5150/api/voice/session" `
+  --email "boplex-smoke@example.com" `
+  --password "dev-password-123" `
+  --lang "wo" `
+  --market "SN-DKR" `
+  --persona "market-guide" `
+  --timeout-seconds 5
+```
+
 ## What success looks like
 
 The loop is considered proven when:
@@ -251,5 +303,5 @@ This runbook preserves the later `Harness × Runtime` direction without blocking
 
 - the external service boundaries are exercised now
 - the mock voice service can later be replaced by PersonaPlex
-- the in-memory search backend can later be replaced by harness-style retrieval internals or BGE-M3/Qdrant/Postgres
+- the in-memory search backend can later be replaced by harness-style retrieval internals or BGE-M3/Qdrant payload-backed retrieval
 - the Engine contract remains stable while internals evolve

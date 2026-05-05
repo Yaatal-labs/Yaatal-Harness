@@ -63,6 +63,7 @@ impl VectorIndex for MemoryVectorIndex {
             .map(|point| IndexedResult {
                 id: point.id.clone(),
                 score: cosine_similarity(vector, &point.vector) as f32,
+                record: None,
             })
             .collect();
 
@@ -181,16 +182,27 @@ fn matches_filters(point: &IndexedPoint, filters: &SearchFilters) -> bool {
     }
 
     for (key, value) in &filters.metadata {
-        if key == "lang" || key == "market" {
-            continue;
-        }
+        match key.as_str() {
+            "lang" | "market" => continue,
+            "source_id" => {
+                if point.source_id != value.as_str().unwrap_or_default() {
+                    return false;
+                }
+            }
+            "title" => {
+                if point.title.as_deref() != value.as_str() {
+                    return false;
+                }
+            }
+            _ => {
+                let Some(point_value) = point.metadata.get(key) else {
+                    return false;
+                };
 
-        let Some(point_value) = point.metadata.get(key) else {
-            return false;
-        };
-
-        if point_value != value {
-            return false;
+                if point_value != value {
+                    return false;
+                }
+            }
         }
     }
 
@@ -214,17 +226,16 @@ impl From<&UpsertDocument> for SearchRecord {
 
 impl From<&SearchRecord> for IndexedPoint {
     fn from(value: &SearchRecord) -> Self {
-        let mut metadata = value.metadata.clone();
-        metadata
-            .entry("source_id".to_string())
-            .or_insert(Value::String(value.source_id.clone()));
         Self {
             id: value.id.clone(),
             vector: embed_text(&value.text),
             source: value.source.clone(),
+            source_id: value.source_id.clone(),
+            title: value.title.clone(),
+            text: value.text.clone(),
             lang: value.lang.clone(),
             market: value.market.clone(),
-            metadata,
+            metadata: value.metadata.clone(),
         }
     }
 }

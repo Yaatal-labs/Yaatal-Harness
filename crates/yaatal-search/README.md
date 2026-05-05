@@ -38,6 +38,24 @@ src/bin/search_service.rs
 
 That is the first directly testable retrieval surface for the Bo-Plex loop.
 
+For local external-backend smoke runs, this crate also includes a deterministic mock embedder:
+
+```text
+src/bin/mock_embedder.rs
+```
+
+That binary serves the minimal HTTP contract expected by the external search backend:
+
+- `GET /health`
+- `POST /embed/query`
+- `POST /embed/documents`
+
+There is also a minimal mock Qdrant surface for local runs when Docker is unavailable:
+
+```text
+src/bin/mock_qdrant.rs
+```
+
 ## Harness fit
 
 If the older internal harness is reused later, this is the best place to do it:

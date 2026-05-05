@@ -26,14 +26,10 @@ pub async fn chat(
     State(_ctx): State<AppContext>,
     Json(req): Json<ChatRequest>,
 ) -> Result<Response> {
-    let base_url = std::env::var("OLLAMA_BASE_URL")
-        .unwrap_or_else(|_| "http://localhost:11434".to_string());
+    let base_url =
+        std::env::var("OLLAMA_BASE_URL").unwrap_or_else(|_| "http://localhost:11434".to_string());
 
-    let model = req
-        .model
-        .as_deref()
-        .unwrap_or("qwen3:8b")
-        .to_string();
+    let model = req.model.as_deref().unwrap_or("qwen3:8b").to_string();
 
     let messages: Vec<serde_json::Value> = req
         .messages

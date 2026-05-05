@@ -1,3 +1,4 @@
+use std::time::Duration;
 use thiserror::Error;
 use yaatal_search::contracts::{SearchRequest, SearchResponse};
 
@@ -19,13 +20,25 @@ impl SearchServiceClient {
     pub fn from_env() -> Self {
         let base_url = std::env::var("SEARCH_SERVICE_URL")
             .unwrap_or_else(|_| "http://127.0.0.1:8081".to_string());
-        Self::new(base_url)
+        let timeout_seconds = std::env::var("SEARCH_SERVICE_TIMEOUT_SECONDS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .filter(|value| *value > 0)
+            .unwrap_or(5);
+        Self::with_timeout(base_url, Duration::from_secs(timeout_seconds))
     }
 
     pub fn new(base_url: impl Into<String>) -> Self {
+        Self::with_timeout(base_url, Duration::from_secs(5))
+    }
+
+    pub fn with_timeout(base_url: impl Into<String>, timeout: Duration) -> Self {
         Self {
             base_url: base_url.into().trim_end_matches('/').to_string(),
-            http: reqwest::Client::new(),
+            http: reqwest::Client::builder()
+                .timeout(timeout)
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
         }
     }
 

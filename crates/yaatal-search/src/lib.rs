@@ -29,8 +29,8 @@ pub use memory::{MemoryDocumentStore, MemoryEmbedder, MemoryVectorIndex};
 pub use python_sidecar::{ColbertHttpRetriever, SidecarIndexDocument};
 pub use service::SearchService;
 pub use traits::{
-    BgeM3HttpEmbedder, DocumentStore, Embedder, IndexedPoint, IndexedResult, PostgresDocumentStore,
-    QdrantHttpIndex, VectorIndex,
+    BgeM3HttpEmbedder, DocumentStore, Embedder, IndexedPoint, IndexedResult,
+    InlinePayloadDocumentStore, PostgresDocumentStore, QdrantHttpIndex, VectorIndex,
 };
 pub use zero_shot::{
     evaluate_zero_shot, RankedHit, Retriever, SearchDocument, SearchQuery, ZeroShotDataset,
