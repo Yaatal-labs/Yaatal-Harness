@@ -1,0 +1,99 @@
+{
+  "project": "Yaatal-Harness",
+  "principle": "Harness owns reusable AI contracts and pipelines; Engine owns runtime/API/session transport.",
+  "features": [
+    {
+      "id": "harness-000",
+      "name": "Agent-resumable harness control files",
+      "description": "Add AGENTS.md, feature_list.json, progress.md, and init.ps1 so future agent sessions can start, verify, scope, and hand off reliably.",
+      "status": "done",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "AGENTS.md documents startup workflow, scope rules, verification, and handoff.",
+        "feature_list.json contains ordered finish/improvement roadmap.",
+        "progress.md records current status and verification evidence.",
+        "init.ps1 exposes check, test, fmt, and all modes."
+      ],
+      "evidence": "2026-05-20: Added AGENTS.md, feature_list.json, progress.md, and init.ps1. Fixed init.ps1 to fail on nonzero command exits. Fixed yaatal-memory doctest imports. Verified feature_list.json parses and .\\init.ps1 -Mode all passed cargo fmt --all --check, cargo check --workspace --all-targets, and cargo test --workspace -- --test-threads=1."
+    },
+    {
+      "id": "harness-001",
+      "name": "Dangerous tool feature gates",
+      "description": "Move shell, file-write, git, web-fetch, and search built-ins behind explicit Cargo features or Engine-supplied adapters.",
+      "status": "done",
+      "dependencies": ["harness-000"],
+      "acceptance_criteria": [
+        "Default tool registration cannot expose shell, file-write, git, web-fetch, or search.",
+        "Tests prove unsafe tools are unavailable by default.",
+        "Documentation explains R&D vs production tool registration."
+      ],
+      "evidence": "2026-05-20: Added yaatal-tools Cargo features default/safe-tools/file-read/session-note/local-shell/file-write/git/network/web-fetch/web-search/r-and-d-tools/all-builtin-tools. Made reqwest and urlencoding optional network dependencies. Changed ToolExecutor::register_builtin to return Result<(), ToolError>; disabled built-ins return PermissionDenied naming the required feature. Default tests prove file_read and session_note register while shell, file_write, git, web_fetch, and search are rejected and absent from list_tools. Feature-gated tests prove file_write, git, web_fetch, and search register when enabled; shell registration is also covered. Verified cargo check -p yaatal-tools --no-default-features, cargo test -p yaatal-tools, cargo test -p yaatal-tools --all-features, cargo test --workspace -- --test-threads=1, and .\\init.ps1 -Mode all."
+    },
+    {
+      "id": "harness-002",
+      "name": "Durable session memory",
+      "description": "Replace process-local session notes with a trait-backed durable store suitable for Engine resume flows.",
+      "status": "done",
+      "dependencies": ["harness-001"],
+      "acceptance_criteria": [
+        "Session notes survive process restart in a file-backed or SQLite-backed implementation.",
+        "SessionNoteTool uses the store abstraction.",
+        "Resume tests cover write, restart/reopen, and recall."
+      ],
+      "evidence": "2026-05-21: Replaced process-local SessionNoteTool state with a public SessionNoteStore trait and FileSessionNoteStore JSON implementation. Default SessionNoteTool registration now writes under the executor workspace at .yaatal/session_notes.json, keyed by RequestContext metadata session_id with request_id fallback. Added SessionNoteTool::with_store for custom adapters, temp-file replacement for writes, .yaatal/ gitignore entry, docs for session_id/path behavior, and tests for executor reopen persistence, direct store reopen, and session-id isolation. Verified cargo test -p yaatal-tools, cargo check -p yaatal-tools --no-default-features, cargo test -p yaatal-tools --all-features, cargo test --workspace -- --test-threads=1, and .\\init.ps1 -Mode all."
+    },
+    {
+      "id": "harness-003",
+      "name": "Engine integration example",
+      "description": "Add an example showing how Yaatal Engine supplies context and adapters while calling Harness search/tool/memory contracts.",
+      "status": "todo",
+      "dependencies": ["harness-001"],
+      "acceptance_criteria": [
+        "Example compiles with workspace tests.",
+        "Harness does not own auth, WebSocket, Loco, or deployment concerns.",
+        "RequestContext fields required from Engine are documented."
+      ],
+      "evidence": ""
+    },
+    {
+      "id": "harness-004",
+      "name": "Bo-Plex evaluation fixtures",
+      "description": "Add small fixtures for search ranking, tool-call parsing, and voice trigger-to-tool response paths.",
+      "status": "todo",
+      "dependencies": ["harness-003"],
+      "acceptance_criteria": [
+        "Search fixture reports MRR/NDCG.",
+        "Tool-call parser fixture validates strict JSON calls.",
+        "Voice fixture validates trigger -> tool -> response contract with mocks."
+      ],
+      "evidence": ""
+    },
+    {
+      "id": "harness-005",
+      "name": "Generator/evaluator loop prototype",
+      "description": "Add a feature-gated minimal sprint contract with mocked generator/evaluator roles.",
+      "status": "todo",
+      "dependencies": ["harness-002", "harness-004"],
+      "acceptance_criteria": [
+        "TaskSpec, SprintContract, and SprintResult contracts exist.",
+        "Mocked generator/evaluator loop has pass and fail tests.",
+        "The prototype is feature-gated and not enabled by default."
+      ],
+      "evidence": ""
+    },
+    {
+      "id": "harness-006",
+      "name": "Internal Symphony R&D workflow contract",
+      "description": "Add a repo-owned WORKFLOW.md and internal notes that adapt Symphony-style orchestration to Yaatal-Harness feature development without making it a BoPlex product surface.",
+      "status": "done",
+      "dependencies": ["harness-000", "harness-001"],
+      "acceptance_criteria": [
+        "WORKFLOW.md defines the local tracker, run lifecycle, subagent pattern, proof-of-work requirements, verification gates, and stop conditions.",
+        "AGENTS.md points future agents to WORKFLOW.md during startup.",
+        "Documentation states this is internal Harness R&D infrastructure, not product runtime.",
+        "A future runner is described as optional and not required for the current setup."
+      ],
+      "evidence": "2026-05-21: Added WORKFLOW.md as a manual Symphony-lite contract for Yaatal-Harness R&D. Added docs/internal-symphony-rd.md mapping Symphony concepts to feature_list.json, progress.md, init.ps1, and Codex subagents. Updated AGENTS.md startup and working rules to include WORKFLOW.md and bounded sidecar subagent use. Verified feature_list.json parses and .\\init.ps1 -Mode check passed."
+    }
+  ]
+}

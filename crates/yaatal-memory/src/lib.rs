@@ -17,8 +17,8 @@
 //! ## Example
 //!
 //! ```rust
-//! use yaatal_memory::{InMemoryStore, MemoryType};
-//! use yaatal_core::MemoryEntry;
+//! use yaatal_memory::InMemoryStore;
+//! use yaatal_core::{MemoryEntry, MemoryStore};
 //!
 //! #[tokio::main]
 //! async fn main() {

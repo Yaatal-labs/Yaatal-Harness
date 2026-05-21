@@ -43,6 +43,8 @@ A modular Rust runtime for retrieval, ranking, recommendation, and agentic AI pi
 
 ## Crates
 
+Runtime placement is documented in [`runtime-distribution.md`](runtime-distribution.md): Harness has an R&D form for proving capabilities and a curated runtime form that Engine can use for reliable AI execution.
+
 ### yaatal-core
 
 The foundational crate containing all shared types and traits.
@@ -95,33 +97,43 @@ let response = router.chat(&ctx, &messages, ChatParams::default()).await?;
 
 ### yaatal-tools
 
-Tool execution runtime with built-in tools.
+Tool execution runtime with safe built-in tools by default. Dangerous R&D
+tools are behind explicit Cargo features so production integrations can supply
+their own adapters.
 
 ```rust
 use yaatal_tools::{ToolExecutor, BuiltinTool};
-use yaatal_core::{RequestContext, Tool, ToolResult};
+use yaatal_core::RequestContext;
 
-// Create executor with built-in tools
+// Create executor with default safe built-in tools
 let executor = ToolExecutor::new();
-executor.register_builtin(BuiltinTool::Shell).await;
-executor.register_builtin(BuiltinTool::FileRead).await;
-executor.register_builtin(BuiltinTool::Search).await;
+executor.register_builtin(BuiltinTool::FileRead).await?;
+executor.register_builtin(BuiltinTool::SessionNote).await?;
 
 // Execute a tool
 let ctx = RequestContext::new("req-1");
-let result = executor.execute(&ctx, "shell", r#"{"command": "ls -la"}"#).await?;
+let result = executor
+    .execute(&ctx, "session_note", r#"{"operation": "read"}"#)
+    .await?;
 ```
 
 #### Built-in Tools
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `shell` | Execute shell commands | `command: string`, `cwd?: string` |
-| `file_read` | Read file contents | `path: string`, `limit?: number` |
-| `file_write` | Write to a file | `path: string`, `content: string` |
-| `git` | Execute git commands | `command: string`, `cwd?: string` |
-| `web_fetch` | Fetch URL content | `url: string`, `method?: string` |
-| `search` | Web search via DuckDuckGo | `query: string`, `num_results?: number` |
+Default features are `safe-tools`, which expands to `file-read` and
+`session-note`. Trusted R&D builds can enable individual unsafe tools or use
+`r-and-d-tools`; `all-builtin-tools` enables both safe and R&D tools.
+
+| Tool | Feature | Default | Description | Parameters |
+|------|---------|---------|-------------|------------|
+| `file_read` | `file-read` | Yes | Read file contents | `path: string`, `limit?: number` |
+| `session_note` | `session-note` | Yes | Read or write workspace-scoped file-backed session notes | `operation: string`, `content?: string` |
+| `shell` | `local-shell` | No | Execute shell commands | `command: string`, `cwd?: string` |
+| `file_write` | `file-write` | No | Write to a file | `path: string`, `content: string` |
+| `git` | `git` | No | Execute allowlisted git commands | `command: string`, `cwd?: string` |
+| `web_fetch` | `web-fetch` | No | Fetch URL content | `url: string`, `method?: string` |
+| `search` | `web-search` | No | Web search via DuckDuckGo | `query: string`, `num_results?: number` |
+
+`session_note` persists to `.yaatal/session_notes.json` under the executor workspace. It keys notes by `RequestContext.metadata["session_id"]` and falls back to `request_id` when no stable session id is supplied. Custom storage can be supplied through `SessionNoteTool::with_store`.
 
 ### yaatal-search
 

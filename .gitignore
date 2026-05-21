@@ -1,4 +1,5 @@
 target/
+.yaatal/
 .env
 .env.*
 !.env.example

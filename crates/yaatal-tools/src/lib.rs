@@ -4,35 +4,60 @@
 //! zeroclaw-labs/zeroclaw. It includes:
 //!
 //! - [`ToolExecutor`]: Runtime for managing and executing tools
-//! - Built-in tools: Shell, File I/O, Git, Web Fetch, Search, Session Notes
+//! - Safe built-in tools by default: File Read and Session Notes
+//! - R&D built-in tools behind explicit Cargo features: Shell, File Write, Git,
+//!   Web Fetch, and Search
 //! - Tool registry with validation
 //! - Max steps limiting (prevents infinite loops)
-//! - Session persistence for long-running agents
+//! - File-backed session persistence for long-running agents
 //! - [`intent_router`]: Intent-based tool routing (Picovoice pattern)
+//!
+//! Dangerous tools are not available in the default build. Enable
+//! `r-and-d-tools` or specific features such as `local-shell`, `file-write`,
+//! `git`, `web-fetch`, and `web-search` only in trusted R&D contexts.
 //!
 //! ## Example
 //!
 //! ```rust
 //! use yaatal_tools::{ToolExecutor, BuiltinTool};
-//! use yaatal_core::{RequestContext, Tool, ToolResult};
+//! use yaatal_core::RequestContext;
 //!
 //! #[tokio::main]
-//! async fn main() {
+//! async fn main() -> Result<(), yaatal_core::ToolError> {
 //!     let executor = ToolExecutor::new();
-//!     executor.register_builtin(BuiltinTool::Shell).await;
+//!     executor.register_builtin(BuiltinTool::SessionNote).await?;
 //!
 //!     let ctx = RequestContext::new("test");
-//!     let result = executor.execute(&ctx, "shell", r#"{"command": "echo hello"}"#).await;
+//!     let result = executor
+//!         .execute(&ctx, "session_note", r#"{"operation": "read"}"#)
+//!         .await?;
 //!     println!("{:?}", result);
+//!     Ok(())
 //! }
 //! ```
 
 pub mod intent_router;
 
-use async_trait::async_trait;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock};
+#[cfg(any(feature = "file-read", feature = "file-write"))]
+use std::path::Path;
+#[cfg(any(
+    feature = "file-read",
+    feature = "file-write",
+    feature = "session-note"
+))]
+use std::path::PathBuf;
+use std::sync::Arc;
+#[cfg(any(
+    feature = "local-shell",
+    feature = "file-read",
+    feature = "file-write",
+    feature = "git",
+    feature = "web-fetch",
+    feature = "web-search",
+    feature = "session-note"
+))]
+use std::sync::LazyLock;
 use std::time::Instant;
 use tokio::sync::RwLock;
 use yaatal_core::{
@@ -135,22 +160,92 @@ impl ToolExecutor {
     }
 
     /// Register a builtin tool.
-    pub async fn register_builtin(&self, tool: BuiltinTool) {
-        let workspace_dir = self.workspace_dir().await;
+    pub async fn register_builtin(&self, tool: BuiltinTool) -> Result<(), ToolError> {
         let boxed: Arc<dyn Tool> = match tool {
-            BuiltinTool::Shell => Arc::new(ShellTool::new()),
+            BuiltinTool::Shell => {
+                #[cfg(feature = "local-shell")]
+                {
+                    Ok(Arc::new(ShellTool::new()) as Arc<dyn Tool>)
+                }
+
+                #[cfg(not(feature = "local-shell"))]
+                {
+                    Err(disabled_builtin_error(tool))
+                }
+            }
             BuiltinTool::FileRead => {
-                Arc::new(FileReadTool::new().with_base_dir(workspace_dir.clone()))
+                #[cfg(feature = "file-read")]
+                {
+                    let workspace_dir = self.workspace_dir().await;
+                    Ok(Arc::new(FileReadTool::new().with_base_dir(workspace_dir)) as Arc<dyn Tool>)
+                }
+
+                #[cfg(not(feature = "file-read"))]
+                {
+                    Err(disabled_builtin_error(tool))
+                }
             }
             BuiltinTool::FileWrite => {
-                Arc::new(FileWriteTool::new().with_base_dir(workspace_dir.clone()))
+                #[cfg(feature = "file-write")]
+                {
+                    let workspace_dir = self.workspace_dir().await;
+                    Ok(Arc::new(FileWriteTool::new().with_base_dir(workspace_dir))
+                        as Arc<dyn Tool>)
+                }
+
+                #[cfg(not(feature = "file-write"))]
+                {
+                    Err(disabled_builtin_error(tool))
+                }
             }
-            BuiltinTool::Git => Arc::new(GitTool::new()),
-            BuiltinTool::WebFetch => Arc::new(WebFetchTool::new()),
-            BuiltinTool::Search => Arc::new(SearchTool::new()),
-            BuiltinTool::SessionNote => Arc::new(SessionNoteTool::new()),
-        };
+            BuiltinTool::Git => {
+                #[cfg(feature = "git")]
+                {
+                    Ok(Arc::new(GitTool::new()) as Arc<dyn Tool>)
+                }
+
+                #[cfg(not(feature = "git"))]
+                {
+                    Err(disabled_builtin_error(tool))
+                }
+            }
+            BuiltinTool::WebFetch => {
+                #[cfg(feature = "web-fetch")]
+                {
+                    Ok(Arc::new(WebFetchTool::new()) as Arc<dyn Tool>)
+                }
+
+                #[cfg(not(feature = "web-fetch"))]
+                {
+                    Err(disabled_builtin_error(tool))
+                }
+            }
+            BuiltinTool::Search => {
+                #[cfg(feature = "web-search")]
+                {
+                    Ok(Arc::new(SearchTool::new()) as Arc<dyn Tool>)
+                }
+
+                #[cfg(not(feature = "web-search"))]
+                {
+                    Err(disabled_builtin_error(tool))
+                }
+            }
+            BuiltinTool::SessionNote => {
+                #[cfg(feature = "session-note")]
+                {
+                    let workspace_dir = self.workspace_dir().await;
+                    Ok(Arc::new(SessionNoteTool::for_workspace(workspace_dir)) as Arc<dyn Tool>)
+                }
+
+                #[cfg(not(feature = "session-note"))]
+                {
+                    Err(disabled_builtin_error(tool))
+                }
+            }
+        }?;
         self.register(boxed).await;
+        Ok(())
     }
 
     /// Add an observer for tool execution events.
@@ -266,7 +361,7 @@ impl ToolExecutor {
 // =============================================================================
 
 /// Enum for built-in tool types.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinTool {
     Shell,
     FileRead,
@@ -279,10 +374,49 @@ pub enum BuiltinTool {
     SessionNote,
 }
 
+impl BuiltinTool {
+    /// Runtime tool name registered for this built-in.
+    pub fn tool_name(self) -> &'static str {
+        match self {
+            Self::Shell => "shell",
+            Self::FileRead => "file_read",
+            Self::FileWrite => "file_write",
+            Self::Git => "git",
+            Self::WebFetch => "web_fetch",
+            Self::Search => "search",
+            Self::SessionNote => "session_note",
+        }
+    }
+
+    /// Cargo feature required to register this built-in.
+    pub fn required_feature(self) -> &'static str {
+        match self {
+            Self::Shell => "local-shell",
+            Self::FileRead => "file-read",
+            Self::FileWrite => "file-write",
+            Self::Git => "git",
+            Self::WebFetch => "web-fetch",
+            Self::Search => "web-search",
+            Self::SessionNote => "session-note",
+        }
+    }
+}
+
+#[allow(dead_code)]
+fn disabled_builtin_error(tool: BuiltinTool) -> ToolError {
+    ToolError::PermissionDenied(format!(
+        "Built-in tool '{}' is disabled; enable Cargo feature '{}'",
+        tool.tool_name(),
+        tool.required_feature()
+    ))
+}
+
+#[cfg(any(feature = "file-read", feature = "file-write"))]
 fn canonicalize_path(path: &Path) -> Result<PathBuf, ToolError> {
     std::fs::canonicalize(path).map_err(|e| ToolError::ExecutionFailed(e.to_string()))
 }
 
+#[cfg(any(feature = "file-read", feature = "file-write"))]
 fn workspace_root(base_dir: &Option<String>) -> Result<PathBuf, ToolError> {
     let base = if let Some(base_dir) = base_dir {
         PathBuf::from(base_dir)
@@ -293,6 +427,7 @@ fn workspace_root(base_dir: &Option<String>) -> Result<PathBuf, ToolError> {
     canonicalize_path(&base)
 }
 
+#[cfg(any(feature = "file-read", feature = "file-write"))]
 fn ensure_within_workspace(workspace: &Path, candidate: &Path) -> Result<(), ToolError> {
     if candidate.starts_with(workspace) {
         Ok(())
@@ -305,6 +440,7 @@ fn ensure_within_workspace(workspace: &Path, candidate: &Path) -> Result<(), Too
     }
 }
 
+#[cfg(any(feature = "file-read", feature = "file-write"))]
 fn resolve_scoped_path(
     base_dir: &Option<String>,
     path: &str,
@@ -337,21 +473,25 @@ fn resolve_scoped_path(
 }
 
 /// Shell command execution tool.
+#[cfg(feature = "local-shell")]
 pub struct ShellTool;
 
+#[cfg(feature = "local-shell")]
 impl ShellTool {
     pub fn new() -> Self {
         Self
     }
 }
 
+#[cfg(feature = "local-shell")]
 impl Default for ShellTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[async_trait]
+#[cfg(feature = "local-shell")]
+#[async_trait::async_trait]
 impl Tool for ShellTool {
     fn metadata(&self) -> &ToolMetadata {
         static METADATA: LazyLock<ToolMetadata> = LazyLock::new(|| {
@@ -410,11 +550,13 @@ impl Tool for ShellTool {
 }
 
 /// File read tool.
+#[cfg(feature = "file-read")]
 pub struct FileReadTool {
     /// Base directory for resolving relative paths ( ACI principle: always absolute paths)
     base_dir: Option<String>,
 }
 
+#[cfg(feature = "file-read")]
 impl FileReadTool {
     pub fn new() -> Self {
         Self { base_dir: None }
@@ -431,13 +573,15 @@ impl FileReadTool {
     }
 }
 
+#[cfg(feature = "file-read")]
 impl Default for FileReadTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[async_trait]
+#[cfg(feature = "file-read")]
+#[async_trait::async_trait]
 impl Tool for FileReadTool {
     fn metadata(&self) -> &ToolMetadata {
         static METADATA: LazyLock<ToolMetadata> = LazyLock::new(|| {
@@ -488,11 +632,13 @@ impl Tool for FileReadTool {
 }
 
 /// File write tool.
+#[cfg(feature = "file-write")]
 pub struct FileWriteTool {
     /// Base directory for resolving relative paths
     base_dir: Option<String>,
 }
 
+#[cfg(feature = "file-write")]
 impl FileWriteTool {
     pub fn new() -> Self {
         Self { base_dir: None }
@@ -509,13 +655,15 @@ impl FileWriteTool {
     }
 }
 
+#[cfg(feature = "file-write")]
 impl Default for FileWriteTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[async_trait]
+#[cfg(feature = "file-write")]
+#[async_trait::async_trait]
 impl Tool for FileWriteTool {
     fn metadata(&self) -> &ToolMetadata {
         static METADATA: LazyLock<ToolMetadata> =
@@ -563,21 +711,25 @@ impl Tool for FileWriteTool {
 }
 
 /// Git operations tool.
+#[cfg(feature = "git")]
 pub struct GitTool;
 
+#[cfg(feature = "git")]
 impl GitTool {
     pub fn new() -> Self {
         Self
     }
 }
 
+#[cfg(feature = "git")]
 impl Default for GitTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[async_trait]
+#[cfg(feature = "git")]
+#[async_trait::async_trait]
 impl Tool for GitTool {
     fn metadata(&self) -> &ToolMetadata {
         static METADATA: LazyLock<ToolMetadata> = LazyLock::new(|| {
@@ -655,21 +807,25 @@ impl Tool for GitTool {
 }
 
 /// Web fetch tool.
+#[cfg(feature = "web-fetch")]
 pub struct WebFetchTool;
 
+#[cfg(feature = "web-fetch")]
 impl WebFetchTool {
     pub fn new() -> Self {
         Self
     }
 }
 
+#[cfg(feature = "web-fetch")]
 impl Default for WebFetchTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[async_trait]
+#[cfg(feature = "web-fetch")]
+#[async_trait::async_trait]
 impl Tool for WebFetchTool {
     fn metadata(&self) -> &ToolMetadata {
         static METADATA: LazyLock<ToolMetadata> = LazyLock::new(|| {
@@ -741,21 +897,25 @@ impl Tool for WebFetchTool {
 }
 
 /// Web search tool (uses DuckDuckGo).
+#[cfg(feature = "web-search")]
 pub struct SearchTool;
 
+#[cfg(feature = "web-search")]
 impl SearchTool {
     pub fn new() -> Self {
         Self
     }
 }
 
+#[cfg(feature = "web-search")]
 impl Default for SearchTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[async_trait]
+#[cfg(feature = "web-search")]
+#[async_trait::async_trait]
 impl Tool for SearchTool {
     fn metadata(&self) -> &ToolMetadata {
         static METADATA: LazyLock<ToolMetadata> = LazyLock::new(|| {
@@ -844,36 +1004,191 @@ impl Tool for SearchTool {
 /// Based on MiniMax's mini-agent SessionNoteTool.
 /// This enables long-running agents to maintain state between sessions.
 
-/// In-memory session notes store.
-/// In production, this could be backed by a file or database.
+#[cfg(feature = "session-note")]
 use tokio::sync::Mutex;
 
-static SESSION_NOTES: LazyLock<Mutex<HashMap<String, Vec<SessionNoteEntry>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
+#[cfg(feature = "session-note")]
+const DEFAULT_SESSION_NOTE_PATH: &str = ".yaatal/session_notes.json";
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct SessionNoteEntry {
-    timestamp: String,
-    content: String,
+/// One persisted session-note entry.
+#[cfg(feature = "session-note")]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct SessionNoteEntry {
+    pub timestamp: String,
+    pub content: String,
+}
+
+/// Trait for backing session notes with durable or custom storage.
+#[cfg(feature = "session-note")]
+#[async_trait::async_trait]
+pub trait SessionNoteStore: Send + Sync {
+    async fn read(&self, session_id: &str) -> Result<Vec<SessionNoteEntry>, ToolError>;
+    async fn append(&self, session_id: &str, entry: SessionNoteEntry) -> Result<(), ToolError>;
+}
+
+#[cfg(feature = "session-note")]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+struct SessionNoteData {
+    #[serde(default)]
+    sessions: HashMap<String, Vec<SessionNoteEntry>>,
+}
+
+/// JSON file-backed session note store.
+#[cfg(feature = "session-note")]
+pub struct FileSessionNoteStore {
+    path: PathBuf,
+    lock: Mutex<()>,
+}
+
+#[cfg(feature = "session-note")]
+impl FileSessionNoteStore {
+    pub fn new(path: impl Into<PathBuf>) -> Self {
+        Self {
+            path: path.into(),
+            lock: Mutex::new(()),
+        }
+    }
+
+    pub fn path(&self) -> &PathBuf {
+        &self.path
+    }
+
+    async fn read_data(&self) -> Result<SessionNoteData, ToolError> {
+        match tokio::fs::read_to_string(&self.path).await {
+            Ok(content) => {
+                if content.trim().is_empty() {
+                    Ok(SessionNoteData::default())
+                } else {
+                    serde_json::from_str(&content).map_err(|e| {
+                        ToolError::ExecutionFailed(format!(
+                            "Failed to parse session note store '{}': {}",
+                            self.path.display(),
+                            e
+                        ))
+                    })
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(SessionNoteData::default()),
+            Err(e) => Err(ToolError::ExecutionFailed(format!(
+                "Failed to read session note store '{}': {}",
+                self.path.display(),
+                e
+            ))),
+        }
+    }
+
+    async fn write_data(&self, data: &SessionNoteData) -> Result<(), ToolError> {
+        if let Some(parent) = self.path.parent() {
+            if !parent.as_os_str().is_empty() {
+                tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                    ToolError::ExecutionFailed(format!(
+                        "Failed to create session note directory '{}': {}",
+                        parent.display(),
+                        e
+                    ))
+                })?;
+            }
+        }
+
+        let content = serde_json::to_string_pretty(data).map_err(|e| {
+            ToolError::ExecutionFailed(format!("Failed to serialize session notes: {}", e))
+        })?;
+        let temp_path = self.path.with_extension("json.tmp");
+
+        tokio::fs::write(&temp_path, content).await.map_err(|e| {
+            ToolError::ExecutionFailed(format!(
+                "Failed to write temporary session note store '{}': {}",
+                temp_path.display(),
+                e
+            ))
+        })?;
+
+        match tokio::fs::rename(&temp_path, &self.path).await {
+            Ok(()) => Ok(()),
+            Err(rename_error) => {
+                match tokio::fs::remove_file(&self.path).await {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => {
+                        let _ = tokio::fs::remove_file(&temp_path).await;
+                        return Err(ToolError::ExecutionFailed(format!(
+                            "Failed to replace session note store '{}': {}; rename failed with {}",
+                            self.path.display(),
+                            e,
+                            rename_error
+                        )));
+                    }
+                }
+
+                tokio::fs::rename(&temp_path, &self.path)
+                    .await
+                    .map_err(|e| {
+                        let _ = std::fs::remove_file(&temp_path);
+                        ToolError::ExecutionFailed(format!(
+                            "Failed to move temporary session note store '{}' to '{}': {}",
+                            temp_path.display(),
+                            self.path.display(),
+                            e
+                        ))
+                    })
+            }
+        }
+    }
+}
+
+#[cfg(feature = "session-note")]
+#[async_trait::async_trait]
+impl SessionNoteStore for FileSessionNoteStore {
+    async fn read(&self, session_id: &str) -> Result<Vec<SessionNoteEntry>, ToolError> {
+        let _guard = self.lock.lock().await;
+        let data = self.read_data().await?;
+        Ok(data.sessions.get(session_id).cloned().unwrap_or_default())
+    }
+
+    async fn append(&self, session_id: &str, entry: SessionNoteEntry) -> Result<(), ToolError> {
+        let _guard = self.lock.lock().await;
+        let mut data = self.read_data().await?;
+        data.sessions
+            .entry(session_id.to_string())
+            .or_insert_with(Vec::new)
+            .push(entry);
+        self.write_data(&data).await
+    }
 }
 
 /// Session note tool for reading/writing persistent notes.
 /// This is critical for long-running agents that need to resume after crashes.
-pub struct SessionNoteTool;
+#[cfg(feature = "session-note")]
+pub struct SessionNoteTool {
+    store: Arc<dyn SessionNoteStore>,
+}
 
+#[cfg(feature = "session-note")]
 impl SessionNoteTool {
     pub fn new() -> Self {
-        Self
+        let workspace = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        Self::for_workspace(workspace)
+    }
+
+    pub fn for_workspace(workspace: impl Into<PathBuf>) -> Self {
+        let path = workspace.into().join(DEFAULT_SESSION_NOTE_PATH);
+        Self::with_store(Arc::new(FileSessionNoteStore::new(path)))
+    }
+
+    pub fn with_store(store: Arc<dyn SessionNoteStore>) -> Self {
+        Self { store }
     }
 }
 
+#[cfg(feature = "session-note")]
 impl Default for SessionNoteTool {
     fn default() -> Self {
         Self::new()
     }
 }
 
-#[async_trait]
+#[cfg(feature = "session-note")]
+#[async_trait::async_trait]
 impl Tool for SessionNoteTool {
     fn metadata(&self) -> &ToolMetadata {
         static METADATA: LazyLock<ToolMetadata> = LazyLock::new(|| {
@@ -915,8 +1230,7 @@ impl Tool for SessionNoteTool {
 
         match args.operation.as_str() {
             "read" => {
-                let notes = SESSION_NOTES.lock().await;
-                let entries = notes.get(&session_id).cloned().unwrap_or_default();
+                let entries = self.store.read(&session_id).await?;
                 let output = if entries.is_empty() {
                     "No session notes found.".to_string()
                 } else {
@@ -939,11 +1253,7 @@ impl Tool for SessionNoteTool {
                     timestamp: timestamp.clone(),
                     content: args.content,
                 };
-                let mut notes = SESSION_NOTES.lock().await;
-                notes
-                    .entry(session_id.clone())
-                    .or_insert_with(Vec::new)
-                    .push(entry);
+                self.store.append(&session_id, entry).await?;
                 Ok(ToolResult::success(format!("Note saved at {}", timestamp)))
             }
             _ => Err(ToolError::InvalidParams(
@@ -1030,9 +1340,240 @@ impl ToolCallParser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(any(feature = "file-read", feature = "session-note"))]
     use std::time::{SystemTime, UNIX_EPOCH};
+    #[cfg(feature = "file-read")]
     use yaatal_core::Tool;
 
+    async fn registered_tool_names(executor: &ToolExecutor) -> Vec<String> {
+        let mut names = executor
+            .list_tools()
+            .await
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    #[cfg(all(feature = "file-read", feature = "session-note"))]
+    #[tokio::test]
+    async fn safe_builtins_register_with_default_features() -> Result<(), ToolError> {
+        let executor = ToolExecutor::new();
+
+        executor.register_builtin(BuiltinTool::FileRead).await?;
+        executor.register_builtin(BuiltinTool::SessionNote).await?;
+
+        let names = registered_tool_names(&executor).await;
+
+        assert_eq!(names, vec!["file_read", "session_note"]);
+        Ok(())
+    }
+
+    #[cfg(feature = "session-note")]
+    #[tokio::test]
+    async fn session_note_persists_across_executor_reopen() -> Result<(), ToolError> {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("yaatal-session-notes-{unique}"));
+        let workspace = root.join("workspace");
+        std::fs::create_dir_all(&workspace)
+            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+
+        let workspace_dir = workspace.to_string_lossy().to_string();
+        let mut ctx = RequestContext::new("resume-test-request");
+        ctx.metadata
+            .insert("session_id".to_string(), "session-a".to_string());
+
+        let executor = ToolExecutor::new().with_workspace_dir(workspace_dir.clone());
+        executor.register_builtin(BuiltinTool::SessionNote).await?;
+        let write_args = serde_json::json!({
+            "operation": "write",
+            "content": "persist me across tool instances"
+        });
+        executor
+            .execute(&ctx, "session_note", &write_args.to_string())
+            .await?;
+
+        let reopened = ToolExecutor::new().with_workspace_dir(workspace_dir);
+        reopened.register_builtin(BuiltinTool::SessionNote).await?;
+        let read_args = serde_json::json!({
+            "operation": "read"
+        });
+        let result = reopened
+            .execute(&ctx, "session_note", &read_args.to_string())
+            .await?;
+
+        assert!(result.success);
+        assert!(result.content.contains("persist me across tool instances"));
+        assert!(workspace.join(DEFAULT_SESSION_NOTE_PATH).exists());
+
+        let _ = std::fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[cfg(feature = "session-note")]
+    #[tokio::test]
+    async fn file_session_note_store_reopens_written_notes() -> Result<(), ToolError> {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("yaatal-session-store-{unique}"));
+        let path = root.join("notes.json");
+
+        let store = FileSessionNoteStore::new(path.clone());
+        store
+            .append(
+                "session-a",
+                SessionNoteEntry {
+                    timestamp: "2026-05-21T00:00:00Z".to_string(),
+                    content: "reopen direct store".to_string(),
+                },
+            )
+            .await?;
+
+        let reopened = FileSessionNoteStore::new(path);
+        let entries = reopened.read("session-a").await?;
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].content, "reopen direct store");
+
+        let _ = std::fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[cfg(feature = "session-note")]
+    #[tokio::test]
+    async fn file_session_note_store_isolates_session_ids() -> Result<(), ToolError> {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("yaatal-session-isolation-{unique}"));
+        let store = FileSessionNoteStore::new(root.join("notes.json"));
+
+        store
+            .append(
+                "session-a",
+                SessionNoteEntry {
+                    timestamp: "2026-05-21T00:00:00Z".to_string(),
+                    content: "only session a".to_string(),
+                },
+            )
+            .await?;
+        store
+            .append(
+                "session-b",
+                SessionNoteEntry {
+                    timestamp: "2026-05-21T00:00:01Z".to_string(),
+                    content: "only session b".to_string(),
+                },
+            )
+            .await?;
+
+        let session_a = store.read("session-a").await?;
+        let session_b = store.read("session-b").await?;
+
+        assert_eq!(session_a.len(), 1);
+        assert_eq!(session_a[0].content, "only session a");
+        assert_eq!(session_b.len(), 1);
+        assert_eq!(session_b[0].content, "only session b");
+
+        let _ = std::fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[cfg(not(any(
+        feature = "local-shell",
+        feature = "file-write",
+        feature = "git",
+        feature = "web-fetch",
+        feature = "web-search"
+    )))]
+    #[tokio::test]
+    async fn unsafe_builtins_are_rejected_without_rd_features() {
+        let executor = ToolExecutor::new();
+        let disabled_tools = [
+            BuiltinTool::Shell,
+            BuiltinTool::FileWrite,
+            BuiltinTool::Git,
+            BuiltinTool::WebFetch,
+            BuiltinTool::Search,
+        ];
+
+        for tool in disabled_tools {
+            let result = executor.register_builtin(tool).await;
+            match result {
+                Err(ToolError::PermissionDenied(message)) => {
+                    assert!(message.contains(tool.tool_name()));
+                    assert!(message.contains(tool.required_feature()));
+                }
+                other => panic!("expected permission denial for {tool:?}, got {other:?}"),
+            }
+        }
+
+        assert!(registered_tool_names(&executor).await.is_empty());
+    }
+
+    #[cfg(feature = "local-shell")]
+    #[tokio::test]
+    async fn shell_builtin_registers_when_enabled() -> Result<(), ToolError> {
+        let executor = ToolExecutor::new();
+
+        executor.register_builtin(BuiltinTool::Shell).await?;
+
+        assert_eq!(registered_tool_names(&executor).await, vec!["shell"]);
+        Ok(())
+    }
+
+    #[cfg(feature = "file-write")]
+    #[tokio::test]
+    async fn file_write_builtin_registers_when_enabled() -> Result<(), ToolError> {
+        let executor = ToolExecutor::new();
+
+        executor.register_builtin(BuiltinTool::FileWrite).await?;
+
+        assert_eq!(registered_tool_names(&executor).await, vec!["file_write"]);
+        Ok(())
+    }
+
+    #[cfg(feature = "git")]
+    #[tokio::test]
+    async fn git_builtin_registers_when_enabled() -> Result<(), ToolError> {
+        let executor = ToolExecutor::new();
+
+        executor.register_builtin(BuiltinTool::Git).await?;
+
+        assert_eq!(registered_tool_names(&executor).await, vec!["git"]);
+        Ok(())
+    }
+
+    #[cfg(feature = "web-fetch")]
+    #[tokio::test]
+    async fn web_fetch_builtin_registers_when_enabled() -> Result<(), ToolError> {
+        let executor = ToolExecutor::new();
+
+        executor.register_builtin(BuiltinTool::WebFetch).await?;
+
+        assert_eq!(registered_tool_names(&executor).await, vec!["web_fetch"]);
+        Ok(())
+    }
+
+    #[cfg(feature = "web-search")]
+    #[tokio::test]
+    async fn web_search_builtin_registers_when_enabled() -> Result<(), ToolError> {
+        let executor = ToolExecutor::new();
+
+        executor.register_builtin(BuiltinTool::Search).await?;
+
+        assert_eq!(registered_tool_names(&executor).await, vec!["search"]);
+        Ok(())
+    }
+
+    #[cfg(feature = "file-read")]
     #[tokio::test]
     async fn file_read_rejects_paths_outside_workspace() {
         let unique = SystemTime::now()
