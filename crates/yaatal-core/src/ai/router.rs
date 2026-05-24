@@ -351,7 +351,13 @@ impl AiRouter {
             .timeout(timeout)
             .json(&body)
             .send()
-            .await?;
+            .await?
+            .error_for_status()
+            .map_err(|e| AiError::TierFailed {
+                tier: 0,
+                name: model.to_string(),
+                reason: format!("provider http error: {e}"),
+            })?;
         let json: serde_json::Value = response.json().await?;
         let content = json["choices"][0]["message"]["content"]
             .as_str()
