@@ -16,7 +16,14 @@ pub trait SettlementAdapter: Send + Sync {
     /// final settlement — truth arrives via `confirm`/`poll`.
     async fn initiate(&self, req: &PaymentRequest) -> Result<PaymentHandle, PaymentError>;
 
-    /// Normalize a provider callback into a result.
+    /// Verify the provider's signature over the raw callback. Each adapter
+    /// owns the scheme (HMAC header, JWS, mTLS, etc.). MUST return
+    /// `PaymentError::InvalidCallback` on any verification failure — never
+    /// panic on malformed input.
+    async fn verify_signature(&self, raw: &RawCallback) -> Result<(), PaymentError>;
+
+    /// Normalize a provider callback into a result. Assumes
+    /// `verify_signature` has already returned `Ok`.
     /// MUST be idempotent on `(rail, provider_ref, idempotency_key)`.
     async fn confirm(&self, raw: &RawCallback) -> Result<PaymentResult, PaymentError>;
 

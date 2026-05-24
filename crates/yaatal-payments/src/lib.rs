@@ -23,4 +23,4 @@ pub use events::{
     PaymentEventKind,
 };
 pub use selector::RailSelector;
-pub use webhook::RawCallback;
+pub use webhook::{RawCallback, WebhookRouter};

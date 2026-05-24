@@ -43,6 +43,12 @@ impl RailSelector {
         let rail = self.resolve_rail(req);
         self.adapters.get(&rail).map(Arc::clone)
     }
+
+    /// Look up an adapter purely by rail tag. Used by the webhook router,
+    /// which receives a `RawCallback` already tagged with its rail.
+    pub fn adapter_for_rail(&self, rail: Rail) -> Option<Arc<dyn SettlementAdapter>> {
+        self.adapters.get(&rail).map(Arc::clone)
+    }
 }
 
 #[cfg(test)]
@@ -72,6 +78,10 @@ mod tests {
                 provider_ref: self.marker.to_owned(),
                 idempotency_key: uuid::Uuid::nil(),
             })
+        }
+
+        async fn verify_signature(&self, _raw: &RawCallback) -> Result<(), PaymentError> {
+            Ok(())
         }
 
         async fn confirm(&self, _raw: &RawCallback) -> Result<PaymentResult, PaymentError> {
