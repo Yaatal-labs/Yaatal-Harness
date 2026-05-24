@@ -1,0 +1,14 @@
+[package]
+name = "yaatal-payments"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Internal payment wrapper for YAATAL — normalized contract over mobile-money rails (Wave first), idempotent async state machine"
+
+[dependencies]
+
+[dev-dependencies]
+pretty_assertions.workspace = true
+
+[lints]
+workspace = true
