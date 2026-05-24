@@ -11,11 +11,16 @@
 pub mod adapter;
 pub mod contract;
 pub mod error;
+pub mod events;
 pub mod selector;
 pub mod webhook;
 
 pub use adapter::SettlementAdapter;
 pub use contract::{Currency, PaymentHandle, PaymentRequest, PaymentResult, PaymentStatus, Rail};
 pub use error::PaymentError;
+pub use events::{
+    EventDiscriminant, EventIdentity, EventStore, InMemoryEventStore, PaymentEvent,
+    PaymentEventKind,
+};
 pub use selector::RailSelector;
 pub use webhook::RawCallback;
