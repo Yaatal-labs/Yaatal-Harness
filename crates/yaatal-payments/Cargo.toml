@@ -6,9 +6,15 @@ license.workspace = true
 description = "Internal payment wrapper for YAATAL — normalized contract over mobile-money rails (Wave first), idempotent async state machine"
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 
 [dev-dependencies]
 pretty_assertions.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

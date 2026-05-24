@@ -7,3 +7,9 @@
 //! unrelated parties, and is not an aggregator or payment service provider for
 //! external merchants. Any change that would cross into holding or routing
 //! other people's money is out of scope and must be flagged.
+
+pub mod contract;
+pub mod error;
+
+pub use contract::{Currency, PaymentHandle, PaymentRequest, PaymentResult, PaymentStatus, Rail};
+pub use error::PaymentError;
