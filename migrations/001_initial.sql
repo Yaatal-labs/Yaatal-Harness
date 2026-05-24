@@ -1,3 +1,8 @@
+-- ARCHIVED: SQLite-dialect baseline schema from the libSQL era.
+-- Postgres-native equivalent is at crates/yaatal-api/migration/src/m20260601_000000_extensions.rs
+-- and later sea-orm migrations.
+-- This file is preserved for historical reference; do not run against Postgres.
+--
 -- Yaatal Engine — Initial Schema
 -- Ported from YOKK supabase/schema.sql for Turso/libSQL
 

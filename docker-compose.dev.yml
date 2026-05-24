@@ -1,0 +1,41 @@
+volumes:
+  pgdata:
+
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    container_name: yaatal-postgres
+    environment:
+      POSTGRES_USER: yaatal
+      POSTGRES_PASSWORD: yaatal_dev
+      POSTGRES_DB: yaatal_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U yaatal -d yaatal_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: yaatal-pgbouncer
+    environment:
+      DATABASE_URL: "postgres://yaatal:yaatal_dev@postgres:5432/yaatal_dev"
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "100"
+      DEFAULT_POOL_SIZE: "20"
+    ports:
+      - "6432:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U yaatal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
