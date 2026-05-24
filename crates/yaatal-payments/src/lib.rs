@@ -8,8 +8,14 @@
 //! external merchants. Any change that would cross into holding or routing
 //! other people's money is out of scope and must be flagged.
 
+pub mod adapter;
 pub mod contract;
 pub mod error;
+pub mod selector;
+pub mod webhook;
 
+pub use adapter::SettlementAdapter;
 pub use contract::{Currency, PaymentHandle, PaymentRequest, PaymentResult, PaymentStatus, Rail};
 pub use error::PaymentError;
+pub use selector::RailSelector;
+pub use webhook::RawCallback;
