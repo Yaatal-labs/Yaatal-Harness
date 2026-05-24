@@ -8,6 +8,12 @@ description = "Shared types, models, AI router, and business logic for Yaatal En
 [lints]
 workspace = true
 
+[features]
+## Enable the Cloudflare R2 edge store backend.
+## Does not pull in aws-sdk-s3 yet — that's a follow-up lane when the R2
+## client is ready to be wired.
+r2 = []
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true

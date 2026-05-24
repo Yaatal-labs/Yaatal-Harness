@@ -15,6 +15,7 @@ pub mod gamification;
 pub mod models;
 pub mod policy;
 pub mod sanitize;
+pub mod storage;
 
 pub use ai::network::{NetworkCondition, NetworkGate};
 pub use ai::rate_limit::RateLimiterPool;
