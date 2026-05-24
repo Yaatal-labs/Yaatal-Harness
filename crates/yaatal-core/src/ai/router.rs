@@ -6,15 +6,21 @@
 //! The router is data-driven — tiers are defined in [`TierConfig`] structs
 //! rather than hard-coded match arms, making it easy to add/remove providers.
 
+use crate::ai::circuit_breaker::CircuitBreaker;
 use crate::ai::classify::classify_task;
 use crate::ai::network::{DefaultNetworkGate, NetworkCondition, NetworkGate};
 use crate::ai::rate_limit::RateLimiterPool;
 use crate::ai::sensitivity::is_sensitive;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use thiserror::Error;
+
+// Notion §FAILURE HANDLING — 5 consecutive failures → 5-minute cool-off per tier.
+const BREAKER_THRESHOLD: u32 = 5;
+const BREAKER_COOL_OFF: Duration = Duration::from_secs(300);
 
 // ── Errors ──────────────────────────────────────────────────────────
 
@@ -178,6 +184,10 @@ pub struct AiRouter {
     tiers: Vec<TierConfig>,
     network_gate: Box<dyn NetworkGate>,
     rate_limiters: Mutex<RateLimiterPool>,
+    /// One breaker per networked tier, keyed by tier.name.
+    /// On-device tiers (`KeyField::None`) get no breaker — they don't fail
+    /// in the way networked providers do.
+    breakers: HashMap<&'static str, CircuitBreaker>,
 }
 
 impl AiRouter {
@@ -198,9 +208,16 @@ impl AiRouter {
             .map_err(|e| AiError::ClientBuild(e.to_string()))?;
 
         let mut pool = RateLimiterPool::default();
+        let mut breakers = HashMap::new();
         for tier in &tiers {
             if tier.rate_limit_rpm > 0 {
                 pool.register(tier.name, tier.rate_limit_rpm);
+            }
+            if tier.key_field != KeyField::None {
+                breakers.insert(
+                    tier.name,
+                    CircuitBreaker::new(BREAKER_THRESHOLD, BREAKER_COOL_OFF),
+                );
             }
         }
 
@@ -210,6 +227,7 @@ impl AiRouter {
             tiers,
             network_gate,
             rate_limiters: Mutex::new(pool),
+            breakers,
         })
     }
 
@@ -251,6 +269,19 @@ impl AiRouter {
                     tier_cfg.name,
                 );
                 continue;
+            }
+
+            // ── Gate: circuit breaker (per-tier failure throttle) ─
+            if let Some(breaker) = self.breakers.get(tier_cfg.name) {
+                if !breaker.allow_request() {
+                    tracing::warn!(
+                        tier = tier_cfg.tier,
+                        name = tier_cfg.name,
+                        state = ?breaker.state(),
+                        "tier skipped: circuit breaker open"
+                    );
+                    continue;
+                }
             }
 
             // ── Gate: rate limit ─────────────────────────────────
@@ -311,6 +342,9 @@ impl AiRouter {
                 .await
             {
                 Ok(content) => {
+                    if let Some(breaker) = self.breakers.get(tier_cfg.name) {
+                        breaker.on_success();
+                    }
                     let latency_ms = start.elapsed().as_millis() as u64;
                     return Ok(AiResponse {
                         content,
@@ -321,12 +355,29 @@ impl AiRouter {
                     });
                 }
                 Err(e) => {
-                    tracing::warn!("Tier {} ({}) failed: {}", tier_cfg.tier, tier_cfg.name, e);
+                    if let Some(breaker) = self.breakers.get(tier_cfg.name) {
+                        breaker.on_failure();
+                        tracing::warn!(
+                            tier = tier_cfg.tier,
+                            name = tier_cfg.name,
+                            error = %e,
+                            state = ?breaker.state(),
+                            "tier failed; breaker updated"
+                        );
+                    } else {
+                        tracing::warn!("Tier {} ({}) failed: {}", tier_cfg.tier, tier_cfg.name, e);
+                    }
                 }
             }
         }
 
         Err(AiError::AllTiersExhausted)
+    }
+
+    /// Test-only accessor for the per-tier circuit breaker.
+    #[cfg(test)]
+    pub(crate) fn breaker_for(&self, tier_name: &str) -> Option<&CircuitBreaker> {
+        self.breakers.get(tier_name)
     }
 
     async fn call_openai_compatible(
@@ -371,5 +422,71 @@ impl AiRouter {
             });
         }
         Ok(content)
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+    use crate::ai::circuit_breaker::BreakerState;
+
+    fn empty_config() -> AiConfig {
+        AiConfig {
+            siliconflow_key: Some("test".to_owned()),
+            huggingface_key: Some("test".to_owned()),
+            openrouter_key: Some("test".to_owned()),
+            anthropic_key: Some("test".to_owned()),
+        }
+    }
+
+    #[test]
+    fn breakers_registered_for_every_networked_tier() {
+        let router = AiRouter::new(empty_config()).expect("router");
+        // On-device tier (KeyField::None) gets no breaker.
+        assert!(router.breaker_for("on-device").is_none());
+        // Every networked tier in DEFAULT_TIERS gets one.
+        for tier in DEFAULT_TIERS.iter().filter(|t| t.key_field != KeyField::None) {
+            assert!(
+                router.breaker_for(tier.name).is_some(),
+                "no breaker for networked tier {}",
+                tier.name
+            );
+        }
+    }
+
+    #[test]
+    fn five_failures_trip_per_tier_breaker_in_isolation() {
+        let router = AiRouter::new(empty_config()).expect("router");
+        let lfm2 = router.breaker_for("siliconflow-lfm2").expect("registered");
+        let qwen = router.breaker_for("siliconflow-qwen").expect("registered");
+
+        for _ in 0..BREAKER_THRESHOLD {
+            lfm2.on_failure();
+        }
+        // Tripped tier is Open and rejects.
+        assert!(matches!(lfm2.state(), BreakerState::Open { .. }));
+        assert!(!lfm2.allow_request());
+
+        // Sibling tier on the same provider is unaffected — failures are
+        // per-tier, not per-provider.
+        assert_eq!(qwen.state(), BreakerState::Closed);
+        assert!(qwen.allow_request());
+    }
+
+    #[test]
+    fn success_resets_per_tier_counter() {
+        let router = AiRouter::new(empty_config()).expect("router");
+        let openrouter = router.breaker_for("openrouter-premium").expect("registered");
+
+        for _ in 0..(BREAKER_THRESHOLD - 1) {
+            openrouter.on_failure();
+        }
+        assert_eq!(openrouter.state(), BreakerState::Closed);
+        openrouter.on_success();
+        openrouter.on_failure();
+        // Counter was reset by the success — still Closed.
+        assert_eq!(openrouter.state(), BreakerState::Closed);
+        assert!(openrouter.allow_request());
     }
 }
