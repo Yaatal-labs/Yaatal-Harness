@@ -12,6 +12,7 @@ pub mod auth;
 pub mod design;
 pub mod gamification;
 pub mod models;
+pub mod policy;
 pub mod sanitize;
 
 pub use ai::router::AiRouter;
