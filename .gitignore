@@ -28,6 +28,7 @@ Thumbs.db
 
 # Worktrees
 .worktrees/
+.claude/
 
 # Test artifacts
 /coverage
