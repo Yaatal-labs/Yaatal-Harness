@@ -31,3 +31,7 @@ serde_yaml = "0.9"
 pretty_assertions.workspace = true
 mockall.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
+# Re-add the sqlx-sqlite driver for in-memory schema unit tests
+# (tests/e2_schema_relations.rs uses `sqlite::memory:`). Production
+# runtime stays Postgres-only — this feature is dev-only.
+sea-orm = { workspace = true, features = ["sqlx-sqlite"] }
