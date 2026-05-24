@@ -8,15 +8,22 @@ description = "Internal payment wrapper for YAATAL — normalized contract over 
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
 thiserror = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["serde", "clock"] }
 async-trait = "0.1"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+subtle = "2"
 
 [dev-dependencies]
 pretty_assertions.workspace = true
 serde_json.workspace = true
-tokio = { workspace = true, features = ["macros", "rt"] }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+wiremock = "0.6"
 
 [lints]
 workspace = true

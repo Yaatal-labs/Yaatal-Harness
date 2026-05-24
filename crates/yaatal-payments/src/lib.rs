@@ -9,6 +9,7 @@
 //! other people's money is out of scope and must be flagged.
 
 pub mod adapter;
+pub mod adapters;
 pub mod contract;
 pub mod error;
 pub mod events;
