@@ -5,6 +5,9 @@ edition.workspace = true
 license.workspace = true
 description = "Shared types, models, AI router, and business logic for Yaatal Engine"
 
+[lints]
+workspace = true
+
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
@@ -17,6 +20,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
 thiserror = "2"
+serde_yaml = "0.9"
 
 [dev-dependencies]
 pretty_assertions.workspace = true

@@ -1,24 +1,28 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-static SCRIPT_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)<script[^>]*>[\s\S]*?</script>").unwrap()
-});
+// All regex patterns below are compile-time constants — expect() is safe.
+#[allow(clippy::expect_used)]
+static SCRIPT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)<script[^>]*>[\s\S]*?</script>").expect("SCRIPT_RE regex"));
+#[allow(clippy::expect_used)]
 static ON_ATTR_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r#"(?i)on\w+\s*=\s*(?:"[^"]*"|'[^']*'|\S+)"#).unwrap()
+    Regex::new(r#"(?i)on\w+\s*=\s*(?:"[^"]*"|'[^']*'|\S+)"#).expect("ON_ATTR_RE regex")
 });
-static JS_URI_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)javascript:").unwrap()
-});
+#[allow(clippy::expect_used)]
+static JS_URI_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)javascript:").expect("JS_URI_RE regex"));
+#[allow(clippy::expect_used)]
 static DANGEROUS_TAGS_RE: LazyLock<Regex> = LazyLock::new(|| {
     // Matches dangerous HTML tags in two forms:
     // 1. Paired tags: <iframe>...</iframe>
     // 2. Self-closing or unclosed tags: <iframe /> or <iframe>
-    Regex::new(r"(?i)<(iframe|object|embed|form|base|meta)[^>]*>[\s\S]*?</(iframe|object|embed|form|base|meta)>|<(iframe|object|embed|form|base|meta)[^>]*/?>").unwrap()
+    Regex::new(r"(?i)<(iframe|object|embed|form|base|meta)[^>]*>[\s\S]*?</(iframe|object|embed|form|base|meta)>|<(iframe|object|embed|form|base|meta)[^>]*/?>")
+        .expect("DANGEROUS_TAGS_RE regex")
 });
-static DATA_URI_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)data:text/html").unwrap()
-});
+#[allow(clippy::expect_used)]
+static DATA_URI_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)data:text/html").expect("DATA_URI_RE regex"));
 
 pub fn sanitize_content(content: &str) -> String {
     let no_script = SCRIPT_RE.replace_all(content, "");
@@ -30,6 +34,7 @@ pub fn sanitize_content(content: &str) -> String {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
 

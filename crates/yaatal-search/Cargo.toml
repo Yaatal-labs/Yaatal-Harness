@@ -3,8 +3,21 @@ name = "yaatal-search"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "ColBERT search and retrieval for Yaatal Engine (future)"
+description = "Runnable search service and legacy zero-shot retrieval for Yaatal Engine"
+
+[lints]
+workspace = true
 
 [dependencies]
-yaatal-core = { path = "../yaatal-core" }
 serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+reqwest = { workspace = true, features = ["blocking", "json"] }
+axum = "0.8"
+async-trait = "0.1"
+thiserror = "2"
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }

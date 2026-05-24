@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/yaatal-core",
     "crates/yaatal-api",
+    "crates/yaatal-feed",
     "crates/yaatal-voice",
     "crates/yaatal-search",
     "crates/yaatal-payments",
@@ -26,12 +27,27 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 pretty_assertions = "1"
 mockall = "0.13"
+loco-rs = { version = "0.16" }
 
 [workspace.lints.clippy]
+# Correctness — deny outright
 correctness = { level = "deny", priority = -1 }
+# Suspicious patterns
+suspicious = { level = "warn", priority = -1 }
+# Complexity
+complexity = { level = "warn", priority = -1 }
+# Style — enforce consistency
+style = { level = "warn", priority = -1 }
+# Performance suggestions
+perf = { level = "warn", priority = -1 }
+# Individual rules
 unwrap_used = "warn"
 expect_used = "warn"
 panic = "warn"
 todo = "warn"
+dbg_macro = "warn"
 print_stdout = "warn"
 print_stderr = "warn"
+clone_on_ref_ptr = "warn"
+needless_pass_by_value = "warn"
+large_futures = "warn"

@@ -3,11 +3,16 @@ name = "yaatal-voice"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Voice recording, encoding, and transcription for Yaatal Engine"
+description = "Voice pipeline for Yaatal Engine — speech-core C ABI facade + WebSocket transport"
+
+[lints]
+workspace = true
 
 [features]
+default = []
+
 # Gate the cmake/bindgen C++ build behind this feature.
-# Disable it for `--no-default-features` so CI / docs can `cargo check` without
+# Disable for `--no-default-features` so CI / docs can `cargo check` without
 # cmake or ALSA/ONNX system deps installed.
 speech-core-sys = []
 
@@ -16,34 +21,34 @@ speech-core-sys = []
 # Requires: -DORT_DIR=<onnxruntime-root> / libonnxruntime on LD_LIBRARY_PATH.
 models = ["speech-core-sys"]
 
-# Gate the cpal audio-device I/O behind this feature so server builds that
-# consume raw PCM from the WebSocket don't pull in ALSA on Linux.
-device-io = ["dep:cpal"]
+# Native audio capture via cpal — only for standalone hardware/kiosks, not
+# mobile/PWA. Server builds (raw WS PCM input) leave this off.
+edge = ["dep:cpal"]
 
-# Preserve the old cpal+HF-Whisper path for emergency revert.
-legacy-cpal-whisper = ["device-io", "dep:hound"]
+# Restore the old cpal+HF-Whisper transcription path for emergency revert.
+legacy-cpal-whisper = ["edge"]
 
 [dependencies]
 yaatal-core = { path = "../yaatal-core" }
-bytes = "1"
-thiserror = "1"
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 reqwest.workspace = true
 tracing.workspace = true
-
-# Only pulled in when device-io feature is enabled.
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+async-trait = "0.1"
+axum = { version = "0.8", features = ["ws"] }
+futures-util = "0.3"
+tokio-tungstenite = "0.28"
+thiserror = "2"
+bytes = "1.5"
+hound = "3.5"
 cpal = { version = "0.15", optional = true }
-# Only pulled in for legacy-cpal-whisper.
-hound = { version = "3.5", optional = true }
 
 [build-dependencies]
 # cmake and bindgen are always compiled into the build script but their
-# execution is guarded at runtime behind the CARGO_FEATURE_SPEECH_CORE_SYS
-# env var (set by Cargo when the `speech-core-sys` feature is enabled).
-# This means `cargo check --no-default-features` skips cmake/bindgen *invocation*
-# while still compiling the build script itself.
+# execution is guarded at runtime behind CARGO_FEATURE_SPEECH_CORE_SYS
+# (set by Cargo when the `speech-core-sys` feature is enabled).
 cmake = "0.1"
 bindgen = "0.69"
 
