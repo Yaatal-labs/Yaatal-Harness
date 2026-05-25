@@ -74,6 +74,29 @@ jobs:
       - name: Cargo test
         run: cargo test --workspace -- --test-threads=1
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked --quiet
+
+      # Accepted-transitive findings documented in KNOWN-ISSUES.md:
+      #   RUSTSEC-2023-0071 — rsa Marvin attack via sqlx-mysql (we run Postgres only)
+      #   RUSTSEC-2025-0057 — fxhash unmaintained via scraper (templating-only path)
+      # CI fails on ANY OTHER advisory; remove an --ignore here only after the
+      # corresponding KNOWN-ISSUES entry is closed.
+      - name: Cargo audit
+        run: |
+          cargo audit \
+            --ignore RUSTSEC-2023-0071 \
+            --ignore RUSTSEC-2025-0057
+
   windows-stability:
     runs-on: windows-latest
     continue-on-error: true

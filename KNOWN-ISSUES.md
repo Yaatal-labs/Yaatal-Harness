@@ -58,3 +58,70 @@ enables `edge`.
 
 **Fix path (if you want one):** add a CI step `sudo apt-get install -y
 libasound2-dev pkg-config` before any `--all-features` build.
+
+---
+
+## supply-chain/rsa-marvin-attack-unreachable
+
+**Where:** `rsa 0.9.10` pulled in transitively via `sqlx-mysql 0.8.6` (sea-orm default features).
+**Owner:** sea-orm upstream (gating `sqlx-mysql` behind a feature would let us opt out).
+**Status:** Accepted-transitive — code path is unreachable in our deployment.
+
+**Finding.** `cargo audit` reports **RUSTSEC-2023-0071** (CVSS 5.9, medium): the Marvin
+timing-sidechannel attack against RSA decryption. **No fixed upgrade is available
+upstream.**
+
+**Why it's unreachable for us.** The dependency tree is
+`rsa → sqlx-mysql → sqlx-macros-core → sqlx → sea-schema → sea-orm-migration →
+yaatal-api`. We run **Postgres only** — `DATABASE_URL=postgres://…`, `sea-orm` feature
+set `["sqlx-postgres", "runtime-tokio-rustls"]`. The MySQL driver is never
+instantiated at runtime, so the timing sidechannel cannot be exploited against
+Yaatal traffic.
+
+**Mitigation in place.** `.github/workflows/rust-ci.yml` runs `cargo audit
+--ignore RUSTSEC-2023-0071` so CI still flags any **new** vulnerability while
+not noisy-failing on this one.
+
+**Long-term fix.** Track sea-orm for a release that gates `sqlx-mysql` behind a
+non-default feature. Draft issue text for upstream (we can't file directly —
+GitHub MCP scope is restricted to `yaatal-labs/yaatal-engine`):
+
+> **Title:** Gate `sqlx-mysql` (and `rsa` transitive) behind a non-default feature
+>
+> **Body:** Projects that use `sea-orm` exclusively with Postgres still pull
+> `sqlx-mysql 0.8.6 → rsa 0.9.10`, which carries the unfixed RUSTSEC-2023-0071
+> Marvin attack advisory. The `rsa` code path is unreachable for Postgres-only
+> deployments, but `cargo audit` flags it on every CI run.
+>
+> Could the `sqlx-mysql` re-export inside `sea-schema` / `sea-orm-cli` /
+> `sea-orm-migration` be gated behind a `mysql` cargo feature that's off by
+> default, mirroring the existing `sqlx-postgres` / `sqlx-sqlite` gating?
+> Postgres-only consumers would set `default-features = false, features =
+> ["sqlx-postgres", "runtime-tokio-rustls"]` and the `rsa` dep would never
+> resolve. (Repo to copy-paste this into: https://github.com/SeaQL/sea-orm/issues/new)
+
+**Re-evaluate when:**
+- sea-orm ships the `mysql` feature gate.
+- `rsa` ships a fix for RUSTSEC-2023-0071.
+- We adopt MySQL anywhere (then the finding becomes reachable and must be
+  re-triaged).
+
+---
+
+## supply-chain/fxhash-unmaintained
+
+**Where:** `fxhash 0.2.1` pulled in transitively via `loco-rs 0.16.4 → scraper → selectors → fxhash`.
+**Owner:** loco-rs upstream.
+**Status:** Warning, not a vulnerability. RUSTSEC-2025-0057 — crate is no longer
+maintained.
+
+**Reachability.** Scraper is used by Loco-rs for HTML parsing in templating /
+scaffolding tooling. Not a runtime cryptography surface. Continuing to depend on
+`fxhash` is a maintenance hygiene concern, not an exploitation vector.
+
+**Mitigation in place.** `.github/workflows/rust-ci.yml` runs `cargo audit
+--ignore RUSTSEC-2025-0057` so CI doesn't fail on this warning.
+
+**Long-term fix.** Wait for Loco-rs to retire `scraper` or for `scraper` upstream
+to swap to `rustc-hash` / `ahash` / `foldhash`.
+
