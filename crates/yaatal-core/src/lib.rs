@@ -9,6 +9,7 @@
 
 pub mod ai;
 pub mod auth;
+pub mod commerce;
 pub mod db;
 pub mod design;
 pub mod gamification;

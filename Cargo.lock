@@ -6562,6 +6562,7 @@ dependencies = [
 name = "yaatal-core"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chrono",
  "mockall",
  "pretty_assertions",
@@ -6575,6 +6576,7 @@ dependencies = [
  "tokio",
  "tracing",
  "uuid",
+ "yaatal-payments",
 ]
 
 [[package]]
