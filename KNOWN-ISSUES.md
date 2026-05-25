@@ -44,6 +44,20 @@ patched in `voice_routing.rs::VoiceRoutingSession`.
 
 ---
 
+## yaatal-api/postgres-only-migrations-vs-sqlite-test-harness
+
+**Where:** `cargo test -p yaatal-api --test '*'` — every integration test that boots an `App` fails at migration time.
+**Owner:** infrastructure / test harness (not the BOBO commerce schema itself)
+**Status:** Tests fail with `SqliteError { code: 1, message: "near \"EXTENSION\": syntax error" }` (or `near \"Point\": syntax error` on the geography column). The migrations and the schema are correct; the test harness is the mismatch.
+
+**What happens.** Loco-rs's default test harness uses SQLite in-memory. Lane 1 (`m20260601_000000_extensions`) runs `CREATE EXTENSION IF NOT EXISTS vector / pg_cron / postgis / pg_stat_statements` — Postgres-only syntax. Lane 5b's `bobo_orders` migration uses `geography(Point, 4326)` (PostGIS) and `BIGSERIAL` — also Postgres-only. SQLite can't parse any of it, so `cargo test -p yaatal-api` panics during app boot.
+
+**Why we're not gating the migrations on backend.** Tried adding `if manager.get_database_backend() != DatabaseBackend::Postgres { return Ok(()) }` to both extensions and bobo_orders migrations; the change was reverted. The migrations should stay as authored — they describe the real Postgres schema; conditionally skipping them silently hides the test-harness gap rather than solving it.
+
+**The real fix** is to point the test harness at a real Postgres (either Testcontainers, a docker-compose service in CI, or a per-test-suite ephemeral DB). Until then, `cargo test -p yaatal-api` is expected to fail at app boot. The other crates' tests (`yaatal-core`, `yaatal-payments`, `yaatal-feed`, `yaatal-search`, `yaatal-voice`) still pass.
+
+---
+
 ## yaatal-voice/alsa-sys system-dep on CI
 
 **Where:** `cargo build --workspace` (default features) on a Linux runner without `libasound2-dev`.

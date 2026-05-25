@@ -30,7 +30,7 @@ use crate::services::payments_service::PaymentsService;
 // Error mapping
 // ---------------------------------------------------------------------------
 
-fn map_error(e: PaymentError) -> Response {
+fn map_error(e: &PaymentError) -> Response {
     match e {
         PaymentError::RailNotConfigured(_) => {
             (StatusCode::BAD_REQUEST, "rail not configured").into_response()
@@ -38,7 +38,7 @@ fn map_error(e: PaymentError) -> Response {
         PaymentError::IdempotencyConflict => {
             (StatusCode::CONFLICT, "idempotency conflict").into_response()
         }
-        PaymentError::InvalidCallback(ref msg) => {
+        PaymentError::InvalidCallback(msg) => {
             // Do NOT echo the message — it could reveal HMAC oracle info.
             warn!(detail = msg, "invalid callback received");
             (StatusCode::BAD_REQUEST, "invalid signature").into_response()
@@ -66,7 +66,7 @@ pub async fn initiate(
 ) -> Response {
     match svc.initiate(&req).await {
         Ok(handle) => Json(handle).into_response(),
-        Err(e) => map_error(e),
+        Err(ref e) => map_error(e),
     }
 }
 
@@ -110,7 +110,7 @@ pub async fn wave_webhook(
 
     match svc.dispatch_webhook(raw).await {
         Ok(result) => Json(result).into_response(),
-        Err(e) => map_error(e),
+        Err(ref e) => map_error(e),
     }
 }
 
@@ -138,7 +138,7 @@ pub async fn poll(
             };
             Json(body).into_response()
         }
-        Err(e) => map_error(e),
+        Err(ref e) => map_error(e),
     }
 }
 
