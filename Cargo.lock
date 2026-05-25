@@ -6550,8 +6550,10 @@ dependencies = [
  "tracing-subscriber",
  "uuid",
  "validator",
+ "wiremock",
  "yaatal-core",
  "yaatal-feed",
+ "yaatal-payments",
  "yaatal-search",
  "yaatal-voice",
 ]
