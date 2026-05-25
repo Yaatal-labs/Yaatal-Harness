@@ -16,6 +16,10 @@ impl MigrationName for Migration {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Skip on SQLite (in-memory test database). Uses Postgres-specific types.
+        if manager.get_database_backend() == sea_orm::DatabaseBackend::Sqlite {
+            return Ok(());
+        }
         manager
             .get_connection()
             .execute_unprepared(
