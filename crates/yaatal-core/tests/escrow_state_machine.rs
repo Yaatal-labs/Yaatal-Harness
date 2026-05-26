@@ -63,7 +63,8 @@ fn cases() -> Vec<Case> {
         },
         // ── Illegal transitions ───────────────────────────────────────────
         Case {
-            description: "Held + Settle → IllegalTransition (cannot settle without releasing first)",
+            description:
+                "Held + Settle → IllegalTransition (cannot settle without releasing first)",
             from: EscrowState::Held,
             ev: EscrowTransition::Settle,
             expected: Err(EscrowError::IllegalTransition {
@@ -199,10 +200,7 @@ fn all_escrow_transitions() {
     }
 
     // All cases passed — print count for the report.
-    let legal_count = cases()
-        .iter()
-        .filter(|c| c.expected.is_ok())
-        .count();
+    let legal_count = cases().iter().filter(|c| c.expected.is_ok()).count();
     let illegal_count = total - legal_count;
     let _ = (legal_count, illegal_count); // used in report; suppress lint
 }

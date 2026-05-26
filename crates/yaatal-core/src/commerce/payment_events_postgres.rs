@@ -14,11 +14,11 @@
 //! `find_by_idempotency_key` selects all rows for a given key, ordered by
 //! `created_at`, and synthesizes a `PaymentEvent` for each.
 
-use sea_orm::{ConnectionTrait, DatabaseConnection, DatabaseBackend, Statement, Value};
+use sea_orm::{ConnectionTrait, DatabaseBackend, DatabaseConnection, Statement, Value};
 
-use yaatal_payments::events::{EventStore, PaymentEvent, PaymentEventKind};
-use yaatal_payments::error::PaymentError;
 use yaatal_payments::contract::{PaymentStatus, Rail};
+use yaatal_payments::error::PaymentError;
+use yaatal_payments::events::{EventStore, PaymentEvent, PaymentEventKind};
 
 /// Postgres-backed event store. Wraps a sea-orm `DatabaseConnection`.
 ///
@@ -267,9 +267,7 @@ impl PostgresEventStore {
             .await
             .map_err(|e| PaymentError::Transport(e.to_string()))?
             .ok_or_else(|| {
-                PaymentError::Transport(format!(
-                    "row not found after INSERT for key {key}"
-                ))
+                PaymentError::Transport(format!("row not found after INSERT for key {key}"))
             })?;
 
         let rail_str: String = row

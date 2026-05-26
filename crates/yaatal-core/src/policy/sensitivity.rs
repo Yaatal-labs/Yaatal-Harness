@@ -126,7 +126,6 @@ impl<T, S: SensitivityTag> Tagged<T, S> {
     pub fn into_inner(self) -> T {
         self.value
     }
-
 }
 
 // Manual Clone — only when T: Clone; does NOT require S: Clone (ZSTs are Copy
@@ -173,7 +172,11 @@ mod tests {
 
     #[test]
     fn sensitivity_serde_roundtrip() {
-        for variant in [Sensitivity::Sovereign, Sensitivity::Operational, Sensitivity::Public] {
+        for variant in [
+            Sensitivity::Sovereign,
+            Sensitivity::Operational,
+            Sensitivity::Public,
+        ] {
             let json = serde_json::to_string(&variant).expect("serialize");
             let back: Sensitivity = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(variant, back, "round-trip failed for {variant:?}");

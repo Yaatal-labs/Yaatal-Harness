@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use axum::{
     body::Bytes,
     extract::State,
@@ -7,6 +9,7 @@ use axum::{
 use chrono::Utc as ChronoUtc;
 use hmac::{Hmac, Mac};
 use loco_rs::prelude::*;
+use regex::Regex;
 use sea_orm::{ActiveValue::Set, EntityTrait};
 use serde_json::Value;
 use sha2::Sha256;
@@ -15,6 +18,29 @@ use uuid::Uuid;
 use yaatal_core::models::post;
 
 type HmacSha256 = Hmac<Sha256>;
+
+/// Compile-once regex patterns for content sanitization. `expect()` is safe
+/// here because the patterns are constants tested at boot.
+fn sanitize_patterns() -> &'static [Regex; 3] {
+    static PATTERNS: OnceLock<[Regex; 3]> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        #[allow(clippy::expect_used)]
+        {
+            [
+                // Non-greedy `.*?` with `(?s)` so `.` matches newlines. The
+                // `regex` crate does not support lookarounds, so the previous
+                // tempered-greedy pattern was actually invalid and would have
+                // panicked on first webhook call.
+                Regex::new(r"(?is)<script\b[^>]*>.*?</script>")
+                    .expect("constant XSS script-tag pattern compiles"),
+                Regex::new(r#"(?i)on\w+\s*=\s*["'][^"']*["']"#)
+                    .expect("constant XSS on-attribute pattern compiles"),
+                Regex::new(r"(?i)javascript:")
+                    .expect("constant javascript: scheme pattern compiles"),
+            ]
+        }
+    })
+}
 
 // ── Signature verification ────────────────────────────────────────────────────
 
@@ -50,11 +76,7 @@ fn verify_signature(headers: &HeaderMap, body: &[u8], secret: &str) -> bool {
 // ── Content sanitization ──────────────────────────────────────────────────────
 
 fn sanitize(s: &str) -> String {
-    // Strip script tags and common XSS vectors — matches YOKK implementation.
-    let re_script =
-        regex::Regex::new(r"(?i)<script\b[^<]*(?:(?!</script>)<[^<]*)*</script>").unwrap();
-    let re_on = regex::Regex::new(r#"(?i)on\w+\s*=\s*["'][^"']*["']"#).unwrap();
-    let re_js = regex::Regex::new(r"(?i)javascript:").unwrap();
+    let [re_script, re_on, re_js] = sanitize_patterns();
     let s = re_script.replace_all(s, "");
     let s = re_on.replace_all(&s, "");
     re_js.replace_all(&s, "").trim().to_string()
@@ -101,7 +123,6 @@ async fn insert_post(
         is_pinned: Set(0),
         created_at: Set(now.clone()),
         updated_at: Set(now),
-        ..Default::default()
     };
     post::Entity::insert(model).exec(db).await.is_ok()
 }

@@ -33,7 +33,8 @@ impl VoiceRecorder {
     pub fn new() -> Result<Self, RecorderError> {
         let host = cpal::default_host();
         let device = host.default_input_device().ok_or(RecorderError::NoDevice)?;
-        let config = device.default_input_config()
+        let config = device
+            .default_input_config()
             .map_err(|e| RecorderError::BuildStream(e.to_string()))?;
         Ok(Self {
             samples: Arc::new(Mutex::new(Vec::new())),
@@ -48,20 +49,25 @@ impl VoiceRecorder {
         // but cpal::Device is not Clone/Send. Consider storing device info or refactoring.
         let host = cpal::default_host();
         let device = host.default_input_device().ok_or(RecorderError::NoDevice)?;
-        let config = device.default_input_config()
+        let config = device
+            .default_input_config()
             .map_err(|e| RecorderError::BuildStream(e.to_string()))?;
         let samples = self.samples.clone();
-        let stream = device.build_input_stream(
-            &config.into(),
-            move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                if let Ok(mut buffer) = samples.lock() {
-                    buffer.extend_from_slice(data);
-                }
-            },
-            |err| tracing::error!("Audio stream error: {}", err),
-            None,
-        ).map_err(|e| RecorderError::BuildStream(e.to_string()))?;
-        stream.play().map_err(|e| RecorderError::BuildStream(e.to_string()))?;
+        let stream = device
+            .build_input_stream(
+                &config.into(),
+                move |data: &[f32], _: &cpal::InputCallbackInfo| {
+                    if let Ok(mut buffer) = samples.lock() {
+                        buffer.extend_from_slice(data);
+                    }
+                },
+                |err| tracing::error!("Audio stream error: {}", err),
+                None,
+            )
+            .map_err(|e| RecorderError::BuildStream(e.to_string()))?;
+        stream
+            .play()
+            .map_err(|e| RecorderError::BuildStream(e.to_string()))?;
         Ok(stream)
     }
 
@@ -75,18 +81,23 @@ impl VoiceRecorder {
             return Err(RecorderError::Encoding("No audio data recorded".into()));
         }
         let spec = hound::WavSpec {
-            channels: self.channels, sample_rate: self.sample_rate,
-            bits_per_sample: 32, sample_format: hound::SampleFormat::Float,
+            channels: self.channels,
+            sample_rate: self.sample_rate,
+            bits_per_sample: 32,
+            sample_format: hound::SampleFormat::Float,
         };
         let mut cursor = std::io::Cursor::new(Vec::new());
         {
             let mut writer = hound::WavWriter::new(&mut cursor, spec)
                 .map_err(|e| RecorderError::Encoding(e.to_string()))?;
             for sample in &samples {
-                writer.write_sample(*sample)
+                writer
+                    .write_sample(*sample)
                     .map_err(|e| RecorderError::Encoding(e.to_string()))?;
             }
-            writer.finalize().map_err(|e| RecorderError::Encoding(e.to_string()))?;
+            writer
+                .finalize()
+                .map_err(|e| RecorderError::Encoding(e.to_string()))?;
         }
         Ok(cursor.into_inner())
     }

@@ -101,12 +101,7 @@ mod tests {
         sel.register(Arc::new(CardAdapter::new()));
         sel.register(Arc::new(CryptoAdapter::new()));
 
-        for rail in [
-            Rail::OrangeMoney,
-            Rail::FreeMoney,
-            Rail::Card,
-            Rail::Crypto,
-        ] {
+        for rail in [Rail::OrangeMoney, Rail::FreeMoney, Rail::Card, Rail::Crypto] {
             let picked = sel
                 .pick(&sample_request(rail))
                 .unwrap_or_else(|| panic!("rail {rail:?} not registered"));

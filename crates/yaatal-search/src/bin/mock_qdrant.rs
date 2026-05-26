@@ -1,3 +1,8 @@
+// Dev/test mock Qdrant server. `expect()` panics on bind/parse errors are
+// the right behavior for a tool that exists only to support local dev — the
+// workspace `expect_used` lint is muted file-wide.
+#![allow(clippy::expect_used)]
+
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -118,7 +123,6 @@ async fn upsert_points(
     let points = body
         .get("points")
         .and_then(Value::as_array)
-        .ok_or_else(|| "points array missing")
         .expect("points array missing");
 
     let mut guard = state.collections.lock().await;

@@ -62,7 +62,10 @@ impl WaveAdapter {
 
     fn checkout_endpoint(&self) -> String {
         // TODO: confirm against Wave Business API docs.
-        format!("{}/checkout/sessions", self.config.api_base.trim_end_matches('/'))
+        format!(
+            "{}/checkout/sessions",
+            self.config.api_base.trim_end_matches('/')
+        )
     }
 
     fn session_endpoint(&self, provider_ref: &str) -> String {
@@ -145,9 +148,10 @@ impl SettlementAdapter for WaveAdapter {
             .event_store
             .find_by_idempotency_key(req.idempotency_key)
             .await?;
-        if let Some(existing) = prior.iter().find(|e| {
-            e.rail == Rail::Wave && e.kind.discriminant() == EventDiscriminant::Initiated
-        }) {
+        if let Some(existing) = prior
+            .iter()
+            .find(|e| e.rail == Rail::Wave && e.kind.discriminant() == EventDiscriminant::Initiated)
+        {
             tracing::debug!(
                 idempotency_key = %req.idempotency_key,
                 provider_ref = %existing.provider_ref,
@@ -225,7 +229,9 @@ impl SettlementAdapter for WaveAdapter {
         if provided.ct_eq(&expected).into() {
             Ok(())
         } else {
-            Err(PaymentError::InvalidCallback("signature mismatch".to_owned()))
+            Err(PaymentError::InvalidCallback(
+                "signature mismatch".to_owned(),
+            ))
         }
     }
 
@@ -367,7 +373,7 @@ mod tests {
     async fn happy_path_initiate_then_confirm_succeeded() {
         let server = MockServer::start().await;
         let store = Arc::new(InMemoryEventStore::new()) as Arc<dyn EventStore>;
-        let adapter = make_adapter(server.uri(), store.clone());
+        let adapter = make_adapter(server.uri(), Arc::clone(&store));
 
         Mock::given(method("POST"))
             .and(path("/checkout/sessions"))
@@ -437,7 +443,7 @@ mod tests {
     async fn replay_initiate_short_circuits_no_extra_http_call() {
         let server = MockServer::start().await;
         let store = Arc::new(InMemoryEventStore::new()) as Arc<dyn EventStore>;
-        let adapter = make_adapter(server.uri(), store.clone());
+        let adapter = make_adapter(server.uri(), Arc::clone(&store));
 
         // Mock the endpoint exactly once. wiremock fails the test if it's hit
         // more than `expect()` times.

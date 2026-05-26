@@ -87,10 +87,7 @@ pub enum EscrowError {
 ///
 /// This is a pure function — all side-effects (DB `UPDATE ... WHERE state =
 /// $expected RETURNING *`) are the caller's responsibility.
-pub fn transition(
-    current: EscrowState,
-    ev: EscrowTransition,
-) -> Result<EscrowState, EscrowError> {
+pub fn transition(current: EscrowState, ev: EscrowTransition) -> Result<EscrowState, EscrowError> {
     match (current, ev) {
         // ── Legal transitions ──────────────────────────────────────────────
         (EscrowState::Held, EscrowTransition::Release) => Ok(EscrowState::Released),

@@ -54,10 +54,10 @@ pub async fn chat(
 
     if !ollama_resp.status().is_success() {
         let status = ollama_resp.status().as_u16();
-        return Ok(Response::builder()
+        return Response::builder()
             .status(StatusCode::BAD_GATEWAY)
             .body(Body::from(format!("Ollama error: {status}")))
-            .unwrap());
+            .map_err(|e| loco_rs::Error::string(&format!("response build: {e}")));
     }
 
     // Forward Ollama's SSE stream directly — zero copy, no buffering.

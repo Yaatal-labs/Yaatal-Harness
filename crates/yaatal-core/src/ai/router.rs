@@ -446,7 +446,10 @@ mod tests {
         // On-device tier (KeyField::None) gets no breaker.
         assert!(router.breaker_for("on-device").is_none());
         // Every networked tier in DEFAULT_TIERS gets one.
-        for tier in DEFAULT_TIERS.iter().filter(|t| t.key_field != KeyField::None) {
+        for tier in DEFAULT_TIERS
+            .iter()
+            .filter(|t| t.key_field != KeyField::None)
+        {
             assert!(
                 router.breaker_for(tier.name).is_some(),
                 "no breaker for networked tier {}",
@@ -477,7 +480,9 @@ mod tests {
     #[test]
     fn success_resets_per_tier_counter() {
         let router = AiRouter::new(empty_config()).expect("router");
-        let openrouter = router.breaker_for("openrouter-premium").expect("registered");
+        let openrouter = router
+            .breaker_for("openrouter-premium")
+            .expect("registered");
 
         for _ in 0..(BREAKER_THRESHOLD - 1) {
             openrouter.on_failure();

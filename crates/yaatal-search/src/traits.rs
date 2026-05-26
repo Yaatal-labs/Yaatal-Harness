@@ -539,6 +539,7 @@ fn parse_vector(value: &Value) -> Result<Vec<f32>, SearchError> {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used)]
 mod tests {
     use super::{build_qdrant_filter, parse_vector};
     use crate::contracts::SearchFilters;

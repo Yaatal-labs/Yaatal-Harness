@@ -275,10 +275,7 @@ mod tests {
             .await
             .expect("c");
 
-        let found = store
-            .find_by_idempotency_key(key)
-            .await
-            .expect("find");
+        let found = store.find_by_idempotency_key(key).await.expect("find");
         assert_eq!(found.len(), 2, "two events for the queried key");
         assert_eq!(
             store

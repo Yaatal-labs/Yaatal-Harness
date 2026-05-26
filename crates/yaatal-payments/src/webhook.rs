@@ -85,7 +85,9 @@ mod tests {
         }
 
         async fn initiate(&self, _req: &PaymentRequest) -> Result<PaymentHandle, PaymentError> {
-            Err(PaymentError::Transport("not used in webhook test".to_owned()))
+            Err(PaymentError::Transport(
+                "not used in webhook test".to_owned(),
+            ))
         }
 
         async fn verify_signature(&self, _raw: &RawCallback) -> Result<(), PaymentError> {
@@ -97,10 +99,7 @@ mod tests {
                 status: PaymentStatus::Succeeded,
                 rail: self.rail,
                 provider_ref: self.provider_ref.to_owned(),
-                reference: raw
-                    .header("X-Reference")
-                    .unwrap_or("ref")
-                    .to_owned(),
+                reference: raw.header("X-Reference").unwrap_or("ref").to_owned(),
                 amount: 1_000,
                 fees: None,
                 settled_at: None,

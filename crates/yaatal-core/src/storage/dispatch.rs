@@ -120,7 +120,10 @@ mod tests {
 
         // Both stores accept their own sensitivity level.
         sovereign_store
-            .put("s/key", Tagged::<String, Sovereign>::new("sovereign-val".into()))
+            .put(
+                "s/key",
+                Tagged::<String, Sovereign>::new("sovereign-val".into()),
+            )
             .await
             .expect("sovereign store put");
 

@@ -1,23 +1,31 @@
-/// build.rs for yaatal-voice
-///
-/// When the `speech-core-sys` feature is enabled (which is implied by the
-/// `models` feature):
-///
-/// 1. Runs cmake to build `libspeech_core.a` from `third_party/speech-core`.
-/// 2. Optionally builds `libspeech_core_models.a` when `models` feature is set.
-/// 3. Runs bindgen against `wrapper.h` to generate `OUT_DIR/speech_core_sys.rs`.
-///
-/// When `speech-core-sys` is NOT set (e.g., `cargo check --no-default-features`)
-/// the cmake and bindgen steps are skipped entirely, so the crate compiles
-/// without any system C++ toolchain or ALSA/ONNX Runtime installed.
-///
-/// DOCS_RS guard: docs.rs cross-compiles without native deps — skip all native
-/// build steps on that environment too.
+//! build.rs for yaatal-voice
+//!
+//! When the `speech-core-sys` feature is enabled (which is implied by the
+//! `models` feature):
+//!
+//! 1. Runs cmake to build `libspeech_core.a` from `third_party/speech-core`.
+//! 2. Optionally builds `libspeech_core_models.a` when `models` feature is set.
+//! 3. Runs bindgen against `wrapper.h` to generate `OUT_DIR/speech_core_sys.rs`.
+//!
+//! When `speech-core-sys` is NOT set (e.g., `cargo check --no-default-features`)
+//! the cmake and bindgen steps are skipped entirely, so the crate compiles
+//! without any system C++ toolchain or ALSA/ONNX Runtime installed.
+//!
+//! DOCS_RS guard: docs.rs cross-compiles without native deps — skip all native
+//! build steps on that environment too.
+//!
+//! Lint posture: this is a build script. `expect()` panics on toolchain /
+//! cmake / bindgen failures are the correct way to abort a Cargo build; the
+//! workspace `expect_used` lint is muted file-wide.
+
+#![allow(clippy::expect_used)]
 
 fn main() {
     // Re-run this script if the upstream C header or CMakeLists changes.
     println!("cargo:rerun-if-changed=wrapper.h");
-    println!("cargo:rerun-if-changed=../../third_party/speech-core/include/speech_core/speech_core_c.h");
+    println!(
+        "cargo:rerun-if-changed=../../third_party/speech-core/include/speech_core/speech_core_c.h"
+    );
     println!("cargo:rerun-if-changed=../../third_party/speech-core/CMakeLists.txt");
 
     // Early-exit on docs.rs (no native toolchain available).

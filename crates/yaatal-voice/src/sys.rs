@@ -119,6 +119,10 @@ pub mod mock {
         pub tts_duration_ms: c_float,
     }
 
+    // Manual impl (not `#[derive]`) because the underlying enum is shared with
+    // the bindgen-generated path; derive would conflict when both stub and
+    // real bindings coexist during cfg-gated builds.
+    #[allow(clippy::derivable_impls)]
     impl Default for sc_event_type_t {
         fn default() -> Self {
             sc_event_type_t::SC_EVENT_SESSION_CREATED

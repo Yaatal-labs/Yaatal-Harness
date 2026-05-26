@@ -84,7 +84,7 @@ fn make_callback(rail: Rail, body: Vec<u8>) -> RawCallback {
 async fn webhook_confirm_happy_path_succeeded() {
     let server = MockServer::start().await;
     let store = Arc::new(InMemoryEventStore::new()) as Arc<dyn EventStore>;
-    let adapter = make_wave(server.uri(), store.clone());
+    let adapter = make_wave(server.uri(), Arc::clone(&store));
 
     Mock::given(method("POST"))
         .and(path("/checkout/sessions"))
@@ -95,7 +95,10 @@ async fn webhook_confirm_happy_path_succeeded() {
         .await;
 
     let key = uuid::Uuid::new_v4();
-    let handle = adapter.initiate(&wave_request(key)).await.expect("initiate");
+    let handle = adapter
+        .initiate(&wave_request(key))
+        .await
+        .expect("initiate");
     assert_eq!(handle.provider_ref, "WV_E2E_001");
 
     let body = serde_json::to_vec(&serde_json::json!({
@@ -112,7 +115,7 @@ async fn webhook_confirm_happy_path_succeeded() {
     // (router → verify_signature → confirm) works end-to-end.
     let router = WebhookRouter::new({
         let mut sel = RailSelector::new(Rail::Wave);
-        sel.register(Arc::new(make_wave(server.uri(), store.clone())));
+        sel.register(Arc::new(make_wave(server.uri(), Arc::clone(&store))));
         Arc::new(sel)
     });
     let result = router.dispatch(cb).await.expect("dispatch");
@@ -147,7 +150,10 @@ async fn missed_webhook_poll_recovery_returns_succeeded() {
         .await;
 
     let key = uuid::Uuid::new_v4();
-    let handle = adapter.initiate(&wave_request(key)).await.expect("initiate");
+    let handle = adapter
+        .initiate(&wave_request(key))
+        .await
+        .expect("initiate");
 
     // Webhook never arrives. Caller falls back to poll.
     let status = adapter.poll(&handle).await.expect("poll");
@@ -177,7 +183,7 @@ async fn reversal_callback_yields_reversed() {
 async fn same_idempotency_key_replayed_yields_one_charge() {
     let server = MockServer::start().await;
     let store = Arc::new(InMemoryEventStore::new()) as Arc<dyn EventStore>;
-    let adapter = make_wave(server.uri(), store.clone());
+    let adapter = make_wave(server.uri(), Arc::clone(&store));
 
     Mock::given(method("POST"))
         .and(path("/checkout/sessions"))
@@ -214,8 +220,8 @@ async fn routing_to_stub_returns_rail_not_configured() {
 
     let router = WebhookRouter::new(Arc::clone(&sel));
 
-    let body = serde_json::to_vec(&serde_json::json!({"id": "X", "status": "succeeded"}))
-        .expect("body");
+    let body =
+        serde_json::to_vec(&serde_json::json!({"id": "X", "status": "succeeded"})).expect("body");
     let cb = RawCallback {
         rail: Rail::OrangeMoney,
         headers: vec![],
@@ -235,7 +241,7 @@ async fn normalized_contract_is_uniform_across_rails() {
     // primary value; the runtime calls just demonstrate uniformity.
     let store = Arc::new(InMemoryEventStore::new()) as Arc<dyn EventStore>;
     let wave: Arc<dyn SettlementAdapter> =
-        Arc::new(make_wave("http://unused".to_owned(), store.clone()));
+        Arc::new(make_wave("http://unused".to_owned(), Arc::clone(&store)));
     let om: Arc<dyn SettlementAdapter> = Arc::new(OrangeMoneyAdapter::new());
 
     let req = wave_request(uuid::Uuid::new_v4());
@@ -255,10 +261,7 @@ async fn normalized_contract_is_uniform_across_rails() {
 async fn event_log_is_append_only_initiated_then_settled() {
     let server = MockServer::start().await;
     let store = Arc::new(InMemoryEventStore::new());
-    let adapter = make_wave(
-        server.uri(),
-        Arc::clone(&store) as Arc<dyn EventStore>,
-    );
+    let adapter = make_wave(server.uri(), Arc::clone(&store) as Arc<dyn EventStore>);
 
     Mock::given(method("POST"))
         .and(path("/checkout/sessions"))
@@ -269,7 +272,10 @@ async fn event_log_is_append_only_initiated_then_settled() {
         .await;
 
     let key = uuid::Uuid::new_v4();
-    adapter.initiate(&wave_request(key)).await.expect("initiate");
+    adapter
+        .initiate(&wave_request(key))
+        .await
+        .expect("initiate");
 
     let body = serde_json::to_vec(&serde_json::json!({
         "id": "WV_LOG_001",

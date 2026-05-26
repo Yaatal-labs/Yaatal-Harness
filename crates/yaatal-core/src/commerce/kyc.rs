@@ -50,7 +50,11 @@ pub struct KycProfile {
 
 impl KycProfile {
     /// Create a new unverified profile ready for insertion.
-    pub fn new_unverified(pid: Uuid, provider: impl Into<String>, jurisdiction: impl Into<String>) -> Self {
+    pub fn new_unverified(
+        pid: Uuid,
+        provider: impl Into<String>,
+        jurisdiction: impl Into<String>,
+    ) -> Self {
         Self {
             pid,
             status: KycStatus::Unverified,
