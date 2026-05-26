@@ -62,6 +62,7 @@ impl Hooks for App {
             .add_route(controllers::payments::routes())
             .add_route(controllers::bobo_orders::routes())
             .add_route(controllers::bobo_kyc::routes())
+            .add_route(controllers::livekit::routes())
     }
 
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
@@ -70,6 +71,18 @@ impl Hooks for App {
         // is never gated on analytics config.
         let analytics = Arc::new(AnalyticsDispatcher::from_env());
         let router = router.layer(Extension(analytics));
+
+        // LiveKit config — always attached as Option<Arc<…>>. Endpoints return
+        // 503 when None (set LIVEKIT_API_KEY / _SECRET / _URL to enable).
+        let livekit_cfg = controllers::livekit::LiveKitConfig::from_env().map(Arc::new);
+        if livekit_cfg.is_some() {
+            tracing::info!("livekit config loaded");
+        } else {
+            tracing::warn!(
+                "livekit not configured — /api/livekit/* will return 503 until LIVEKIT_API_KEY/_SECRET/_URL are set"
+            );
+        }
+        let router = router.layer(Extension(livekit_cfg));
 
         // Payments service — only attached when WAVE_* env vars are set. When
         // absent, payment endpoints return 500 (acceptable for dev/CI; the

@@ -5,6 +5,7 @@ pub mod bobo_orders;
 pub mod comments;
 pub mod feed;
 pub mod health;
+pub mod livekit;
 pub mod offline;
 pub mod payments;
 pub mod posts;
