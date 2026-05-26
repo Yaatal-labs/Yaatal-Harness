@@ -16,6 +16,7 @@ yaatal-feed = { path = "../yaatal-feed" }
 yaatal-search = { path = "../yaatal-search" }
 yaatal-voice = { path = "../yaatal-voice" }
 yaatal-payments = { path = "../yaatal-payments" }
+yaatal-analytics = { path = "../yaatal-analytics" }
 loco-rs = { version = "0.16" }
 serde = { workspace = true }
 serde_json = { workspace = true }

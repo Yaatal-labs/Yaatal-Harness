@@ -6,11 +6,14 @@ use crate::{
     },
     views::auth::{CurrentResponse, LoginResponse},
 };
+use axum::Extension;
 use loco_rs::prelude::*;
 use regex::Regex;
 use sea_orm::{ActiveValue::Set, EntityTrait};
 use serde::{Deserialize, Serialize};
-use std::sync::OnceLock;
+use serde_json::json;
+use std::sync::{Arc, OnceLock};
+use yaatal_analytics::{AnalyticsDispatcher, AnalyticsEvent};
 use yaatal_core::models::profile;
 
 pub static EMAIL_DOMAIN_RE: OnceLock<Regex> = OnceLock::new();
@@ -48,6 +51,7 @@ pub struct ResendVerificationParams {
 #[debug_handler]
 async fn register(
     State(ctx): State<AppContext>,
+    Extension(analytics): Extension<Arc<AnalyticsDispatcher>>,
     Json(params): Json<RegisterParams>,
 ) -> Result<Response> {
     let now = chrono::Utc::now().to_rfc3339();
@@ -90,6 +94,12 @@ async fn register(
         .await?;
 
     AuthMailer::send_welcome(&ctx, &user).await?;
+
+    analytics.capture(AnalyticsEvent {
+        name: "user.registered",
+        distinct_id: user.pid.to_string(),
+        properties: json!({"user_pid": user.pid.to_string()}),
+    });
 
     format::json(())
 }

@@ -7,6 +7,7 @@ members = [
     "crates/yaatal-voice",
     "crates/yaatal-search",
     "crates/yaatal-payments",
+    "crates/yaatal-analytics",
     "apps/yokk-mobile",
 ]
 

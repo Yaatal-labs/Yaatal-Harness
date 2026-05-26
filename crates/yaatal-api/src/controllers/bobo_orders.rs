@@ -13,16 +13,20 @@
 //! - `POST /api/bobo/orders/{id}/dispute`                 — buyer raises dispute
 //! - `POST /api/bobo/orders/{id}/cancel`                  — buyer cancels (created-only)
 
+use std::sync::Arc;
+
 use axum::{
     debug_handler,
     extract::{Path, Query, State},
     http::StatusCode,
     response::{IntoResponse, Response},
-    Json,
+    Extension, Json,
 };
 use loco_rs::prelude::*;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use uuid::Uuid;
+use yaatal_analytics::{AnalyticsDispatcher, AnalyticsEvent};
 
 use crate::services::bobo_commerce::{self, CommerceError, EscrowRow, OrderRow};
 
@@ -185,6 +189,7 @@ pub async fn simulate_payment(
 pub async fn confirm_delivery(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
+    Extension(analytics): Extension<Arc<AnalyticsDispatcher>>,
     Path(order_id): Path<i64>,
 ) -> Response {
     let buyer_pid = match parse_pid(&auth.claims.pid) {
@@ -192,11 +197,23 @@ pub async fn confirm_delivery(
         Err(r) => return *r,
     };
     match bobo_commerce::confirm_delivery(&ctx.db, order_id, buyer_pid).await {
-        Ok((order, escrow)) => Json(OrderWithEscrow {
-            order,
-            escrow: Some(escrow),
-        })
-        .into_response(),
+        Ok((order, escrow)) => {
+            analytics.capture(AnalyticsEvent {
+                name: "bobo.escrow.transitioned",
+                distinct_id: buyer_pid.to_string(),
+                properties: json!({
+                    "order_id": order_id,
+                    "from": "held",
+                    "to": escrow.state,
+                    "trigger": "confirm_delivery",
+                }),
+            });
+            Json(OrderWithEscrow {
+                order,
+                escrow: Some(escrow),
+            })
+            .into_response()
+        }
         Err(ref e) => map_error(e),
     }
 }
@@ -205,6 +222,7 @@ pub async fn confirm_delivery(
 pub async fn dispute(
     auth: auth::JWT,
     State(ctx): State<AppContext>,
+    Extension(analytics): Extension<Arc<AnalyticsDispatcher>>,
     Path(order_id): Path<i64>,
 ) -> Response {
     let buyer_pid = match parse_pid(&auth.claims.pid) {
@@ -212,11 +230,23 @@ pub async fn dispute(
         Err(r) => return *r,
     };
     match bobo_commerce::dispute_order(&ctx.db, order_id, buyer_pid).await {
-        Ok((order, escrow)) => Json(OrderWithEscrow {
-            order,
-            escrow: Some(escrow),
-        })
-        .into_response(),
+        Ok((order, escrow)) => {
+            analytics.capture(AnalyticsEvent {
+                name: "bobo.escrow.transitioned",
+                distinct_id: buyer_pid.to_string(),
+                properties: json!({
+                    "order_id": order_id,
+                    "from": "held",
+                    "to": escrow.state,
+                    "trigger": "dispute",
+                }),
+            });
+            Json(OrderWithEscrow {
+                order,
+                escrow: Some(escrow),
+            })
+            .into_response()
+        }
         Err(ref e) => map_error(e),
     }
 }

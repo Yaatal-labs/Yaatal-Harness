@@ -1,0 +1,16 @@
+[package]
+name = "yaatal-analytics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Server-side product analytics abstraction for Yaatal Engine (PostHog, Mock, Log backends)"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+# posthog-rs default feature is "async-client"; we want the blocking client only.
+posthog-rs = { version = "0.7.1", default-features = false }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

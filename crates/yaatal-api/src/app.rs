@@ -17,6 +17,7 @@ use std::{path::Path, sync::Arc};
 use crate::services::payments_service::PaymentsService;
 #[allow(unused_imports)]
 use crate::{controllers, models::_entities::users, tasks, workers::downloader::DownloadWorker};
+use yaatal_analytics::AnalyticsDispatcher;
 
 pub struct App;
 #[async_trait]
@@ -64,9 +65,15 @@ impl Hooks for App {
     }
 
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
-        // Build the PaymentsService from env. If WAVE_* vars are absent the
-        // service falls back to a no-op warning; the binary still starts so
-        // other endpoints are unaffected.
+        // Analytics dispatcher — always attached. `from_env` never panics; it
+        // falls back to `LogSink` when POSTHOG_API_KEY is absent so the boot
+        // is never gated on analytics config.
+        let analytics = Arc::new(AnalyticsDispatcher::from_env());
+        let router = router.layer(Extension(analytics));
+
+        // Payments service — only attached when WAVE_* env vars are set. When
+        // absent, payment endpoints return 500 (acceptable for dev/CI; the
+        // operator sets WAVE_* to enable).
         let svc = match PaymentsService::from_env() {
             Ok(s) => {
                 tracing::info!("payments service initialized");
@@ -74,16 +81,6 @@ impl Hooks for App {
             }
             Err(e) => {
                 tracing::warn!(error = %e, "payments service not configured — payment endpoints will return 503");
-                // We must still attach the extension so axum doesn't 500 on missing extension.
-                // Re-use from_env error path: provide an unconfigured service that errors on use.
-                // We do this by returning a service built with empty env so it short-circuits.
-                // The simplest correct approach: don't attach the extension and let the handlers
-                // deal with its absence. Since Extension<T> returns 500 when absent we return a
-                // minimal stub that always returns Transport error.
-                //
-                // For now: if env is missing, skip attaching the extension. Endpoints will 500
-                // instead of returning structured errors until the operator sets WAVE_* vars.
-                // This is acceptable for a dev/CI context where the vars are intentionally absent.
                 tracing::warn!("skipping payment Extension layer; set WAVE_* env vars to enable");
                 return Ok(router);
             }

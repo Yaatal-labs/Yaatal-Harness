@@ -17,7 +17,9 @@ use axum::{
 };
 use loco_rs::prelude::*;
 use serde::Serialize;
+use serde_json::json;
 use tracing::warn;
+use yaatal_analytics::{AnalyticsDispatcher, AnalyticsEvent};
 use yaatal_payments::{
     contract::{PaymentRequest, Rail},
     error::PaymentError,
@@ -80,6 +82,7 @@ pub async fn initiate(
 #[debug_handler]
 pub async fn wave_webhook(
     axum::Extension(svc): axum::Extension<Arc<PaymentsService>>,
+    axum::Extension(analytics): axum::Extension<Arc<AnalyticsDispatcher>>,
     State(_ctx): State<AppContext>,
     req: Request,
 ) -> Response {
@@ -109,7 +112,17 @@ pub async fn wave_webhook(
     };
 
     match svc.dispatch_webhook(raw).await {
-        Ok(result) => Json(result).into_response(),
+        Ok(result) => {
+            analytics.capture(AnalyticsEvent {
+                name: "payment.webhook_received",
+                distinct_id: "system".into(),
+                properties: json!({
+                    "provider": "wave",
+                    "result": format!("{result:?}"),
+                }),
+            });
+            Json(result).into_response()
+        }
         Err(ref e) => map_error(e),
     }
 }
