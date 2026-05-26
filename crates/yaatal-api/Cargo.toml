@@ -41,6 +41,7 @@ chrono = "0.4"
 validator = "0.20"
 uuid = { version = "1.6", features = ["v4"] }
 include_dir = "0.7"
+base64 = "0.22"
 
 [[bin]]
 name = "yaatal_api-cli"

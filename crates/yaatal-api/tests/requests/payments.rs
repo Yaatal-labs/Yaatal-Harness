@@ -158,11 +158,9 @@ async fn initiate_with_jwt_returns_200_with_handle() {
     // Mock the Wave checkout endpoint.
     Mock::given(method("POST"))
         .and(path("/checkout/sessions"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "id": "WV_SESSION_202"
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "id": "WV_SESSION_202"
+        })))
         .mount(&mock_server)
         .await;
 
@@ -193,8 +191,7 @@ async fn initiate_with_jwt_returns_200_with_handle() {
             response.status_code(),
             response.text()
         );
-        let parsed: serde_json::Value =
-            serde_json::from_str(&response.text()).expect("parse JSON");
+        let parsed: serde_json::Value = serde_json::from_str(&response.text()).expect("parse JSON");
         assert_eq!(parsed["rail"], "Wave");
         assert_eq!(parsed["provider_ref"], "WV_SESSION_202");
     })

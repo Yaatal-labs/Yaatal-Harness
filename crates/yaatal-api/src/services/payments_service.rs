@@ -76,10 +76,9 @@ impl PaymentsService {
 
     /// Initiate a payment. Returns a pending handle.
     pub async fn initiate(&self, req: &PaymentRequest) -> Result<PaymentHandle, PaymentError> {
-        let adapter = self
-            .selector
-            .pick(req)
-            .ok_or_else(|| PaymentError::RailNotConfigured(req.instrument_hint.unwrap_or(Rail::Wave)))?;
+        let adapter = self.selector.pick(req).ok_or_else(|| {
+            PaymentError::RailNotConfigured(req.instrument_hint.unwrap_or(Rail::Wave))
+        })?;
         adapter.initiate(req).await
     }
 

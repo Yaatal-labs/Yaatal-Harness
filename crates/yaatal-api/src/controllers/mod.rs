@@ -1,5 +1,7 @@
 pub mod ai;
 pub mod auth;
+pub mod bobo_kyc;
+pub mod bobo_orders;
 pub mod comments;
 pub mod feed;
 pub mod health;

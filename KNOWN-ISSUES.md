@@ -61,6 +61,29 @@ libasound2-dev pkg-config` before any `--all-features` build.
 
 ---
 
+## bobo/commerce-http-postgres-only
+
+**Where:** `crates/yaatal-api/src/controllers/bobo_orders.rs`, `bobo_kyc.rs`, and `crates/yaatal-api/src/services/bobo_commerce.rs`.
+**Owner:** this branch (Lane 5b HTTP layer).
+**Status:** Documented constraint, not a bug. All BOBO commerce + KYC endpoints **return 503 on a SQLite backend**.
+
+**Why.** The Lane 5b migrations (`m20260615_000001..05`) use Postgres-native features that have no SQLite equivalent:
+- PostGIS `geography(Point, 4326)` for `bobo_orders.delivery_location` + GiST index
+- `BIGSERIAL` PK on `bobo_orders`
+- `BYTEA` for `bobo_kyc.document_hash`
+- `TIMESTAMPTZ` everywhere
+- Append-only `bobo_ledger` enforced via PL/pgSQL trigger
+
+The service module (`bobo_commerce.rs`) hard-checks the backend and short-circuits with `CommerceError::BackendUnsupported` on non-Postgres connections. Controllers translate this to `503 Service Unavailable` with body `"BOBO commerce requires Postgres"`.
+
+**Test posture.** Unit tests for pure helpers (escrow-state parsing) run on any backend. **Integration tests that hit the BOBO endpoints require a real Postgres instance** — they are not currently in the workspace test suite. See the existing Lane 4-lite precedent (`payments`) for the same Postgres-only test split.
+
+**To dogfood locally:** start Postgres + PostGIS (Railway, Hetzner, or `postgres:16-postgis` via docker), set `DATABASE_URL=postgres://...`, run migrations via `cargo run -p yaatal_api-cli -- db migrate`, then hit endpoints with curl using a JWT from `POST /api/auth/login`.
+
+**Includes a DOGFOOD-only endpoint:** `POST /api/bobo/orders/{id}/simulate-payment` synthesizes the payment-landed transition (`created → payment_held` + escrow row `held`). In production this comes from the Wave webhook bridge. The endpoint will be removed once the payment→commerce bridge ships (Lane 5c).
+
+---
+
 ## supply-chain/rsa-marvin-attack-unreachable
 
 **Where:** `rsa 0.9.10` pulled in transitively via `sqlx-mysql 0.8.6` (sea-orm default features).

@@ -14,9 +14,9 @@ use loco_rs::{
 use migration::Migrator;
 use std::{path::Path, sync::Arc};
 
+use crate::services::payments_service::PaymentsService;
 #[allow(unused_imports)]
 use crate::{controllers, models::_entities::users, tasks, workers::downloader::DownloadWorker};
-use crate::services::payments_service::PaymentsService;
 
 pub struct App;
 #[async_trait]
@@ -59,6 +59,8 @@ impl Hooks for App {
             .add_route(controllers::ai::routes())
             .add_route(controllers::webhooks::routes())
             .add_route(controllers::payments::routes())
+            .add_route(controllers::bobo_orders::routes())
+            .add_route(controllers::bobo_kyc::routes())
     }
 
     async fn after_routes(router: AxumRouter, _ctx: &AppContext) -> Result<AxumRouter> {
