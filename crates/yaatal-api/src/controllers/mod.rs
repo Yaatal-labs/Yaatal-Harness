@@ -1,13 +1,17 @@
 pub mod ai;
 pub mod auth;
+pub mod bobo_checkout;
 pub mod bobo_kyc;
 pub mod bobo_orders;
 pub mod comments;
 pub mod feed;
 pub mod health;
 pub mod livekit;
+pub mod merchant;
 pub mod offline;
+pub mod orders;
 pub mod payments;
 pub mod posts;
+pub mod products;
 pub mod voice;
 pub mod webhooks;

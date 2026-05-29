@@ -159,7 +159,7 @@ where
 
         let points: Vec<IndexedPoint> = records
             .iter()
-            .zip(vectors.into_iter())
+            .zip(vectors)
             .map(|(record, vector)| {
                 let mut point = IndexedPoint::from(record);
                 point.vector = vector;

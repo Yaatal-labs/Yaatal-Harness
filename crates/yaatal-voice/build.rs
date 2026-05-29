@@ -28,21 +28,20 @@ fn main() {
     );
     println!("cargo:rerun-if-changed=../../third_party/speech-core/CMakeLists.txt");
 
-    // Early-exit on docs.rs (no native toolchain available).
-    if std::env::var("DOCS_RS").is_ok() {
-        return;
+    // Skip native build steps on docs.rs (no native toolchain available).
+    if std::env::var("DOCS_RS").is_err() {
+        #[cfg(feature = "speech-core-sys")]
+        {
+            // Cargo sets CARGO_FEATURE_<FEATURE_UPPER_SNAKE> for each enabled feature.
+            if std::env::var("CARGO_FEATURE_SPEECH_CORE_SYS").is_ok() {
+                build_speech_core();
+                generate_bindings();
+            }
+        }
     }
-
-    // Early-exit when the speech-core-sys feature is absent.
-    // Cargo sets CARGO_FEATURE_<FEATURE_UPPER_SNAKE> for each enabled feature.
-    if std::env::var("CARGO_FEATURE_SPEECH_CORE_SYS").is_err() {
-        return;
-    }
-
-    build_speech_core();
-    generate_bindings();
 }
 
+#[cfg(feature = "speech-core-sys")]
 fn build_speech_core() {
     // Locate the submodule root relative to the manifest directory.
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
@@ -83,6 +82,7 @@ fn build_speech_core() {
     }
 }
 
+#[cfg(feature = "speech-core-sys")]
 fn generate_bindings() {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR not set");

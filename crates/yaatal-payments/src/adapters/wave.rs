@@ -112,8 +112,7 @@ struct WebhookPayload {
     status: String,
     #[serde(default)]
     client_reference: Option<String>,
-    #[serde(default)]
-    amount: u64,
+    amount: Option<u64>,
     #[serde(default)]
     fees: Option<u64>,
     #[serde(default)]
@@ -240,42 +239,52 @@ impl SettlementAdapter for WaveAdapter {
         let payload: WebhookPayload = serde_json::from_str(body_str)
             .map_err(|e| PaymentError::InvalidCallback(format!("body json: {e}")))?;
         let status = map_wave_status(&payload.status)?;
+        let amount = payload
+            .amount
+            .ok_or_else(|| PaymentError::InvalidCallback("missing amount".to_owned()))?;
+        if amount == 0 {
+            return Err(PaymentError::InvalidCallback(
+                "amount must be greater than zero".to_owned(),
+            ));
+        }
 
         let reference = payload.client_reference.unwrap_or_default();
 
-        // Record the terminal event. The store is idempotent on identity, so
-        // a duplicate webhook re-delivery results in one logical Settled.
-        self.event_store
-            .record(PaymentEvent {
-                rail: Rail::Wave,
-                provider_ref: payload.id.clone(),
-                // Webhook payload doesn't carry idempotency_key directly; the
-                // adapter recovers it via the event log. For T6 we keep the
-                // event's idempotency_key empty (nil) when not recoverable —
-                // this is documented as a known limitation; a follow-up will
-                // index by provider_ref to backfill the key.
-                idempotency_key: prior_key_for_provider_ref(
-                    self.event_store.as_ref(),
-                    Rail::Wave,
-                    &payload.id,
-                )
-                .await
-                .unwrap_or_else(uuid::Uuid::nil),
-                kind: PaymentEventKind::Settled {
-                    status,
-                    fees: payload.fees,
-                    settled_at: payload.settled_at,
-                },
-                recorded_at: chrono::DateTime::<chrono::Utc>::UNIX_EPOCH,
-            })
-            .await?;
+        if status != PaymentStatus::Pending {
+            // Record terminal events only. A provider "pending" callback must
+            // not occupy the Settled identity and block a later success/failure.
+            self.event_store
+                .record(PaymentEvent {
+                    rail: Rail::Wave,
+                    provider_ref: payload.id.clone(),
+                    // Webhook payload doesn't carry idempotency_key directly; the
+                    // adapter recovers it via the event log. For T6 we keep the
+                    // event's idempotency_key empty (nil) when not recoverable —
+                    // this is documented as a known limitation; a follow-up will
+                    // index by provider_ref to backfill the key.
+                    idempotency_key: prior_key_for_provider_ref(
+                        self.event_store.as_ref(),
+                        Rail::Wave,
+                        &payload.id,
+                    )
+                    .await
+                    .unwrap_or_else(uuid::Uuid::nil),
+                    kind: PaymentEventKind::Settled {
+                        status,
+                        fees: payload.fees,
+                        settled_at: payload.settled_at,
+                    },
+                    recorded_at: chrono::DateTime::<chrono::Utc>::UNIX_EPOCH,
+                })
+                .await?;
+        }
 
         Ok(PaymentResult {
             status,
             rail: Rail::Wave,
             provider_ref: payload.id,
             reference,
-            amount: payload.amount,
+            amount,
             fees: payload.fees,
             settled_at: payload.settled_at,
         })
@@ -527,6 +536,51 @@ mod tests {
         adapter.verify_signature(&cb).await.expect("verify");
         match adapter.confirm(&cb).await {
             Err(PaymentError::InvalidCallback(msg)) => assert!(msg.contains("unknown Wave status")),
+            other => panic!("expected InvalidCallback, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_webhook_amount_is_rejected() {
+        let store = Arc::new(InMemoryEventStore::new()) as Arc<dyn EventStore>;
+        let adapter = make_adapter("http://unused".to_owned(), store);
+
+        let body = serde_json::to_vec(&serde_json::json!({
+            "id": "WV_MISSING_AMOUNT",
+            "status": "succeeded",
+        }))
+        .expect("body");
+        let cb = RawCallback {
+            rail: Rail::Wave,
+            headers: vec![("X-Wave-Signature".to_owned(), sign(&sample_secret(), &body))],
+            body,
+        };
+        adapter.verify_signature(&cb).await.expect("verify");
+        match adapter.confirm(&cb).await {
+            Err(PaymentError::InvalidCallback(msg)) => assert!(msg.contains("missing amount")),
+            other => panic!("expected InvalidCallback, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn zero_webhook_amount_is_rejected() {
+        let store = Arc::new(InMemoryEventStore::new()) as Arc<dyn EventStore>;
+        let adapter = make_adapter("http://unused".to_owned(), store);
+
+        let body = serde_json::to_vec(&serde_json::json!({
+            "id": "WV_ZERO_AMOUNT",
+            "status": "succeeded",
+            "amount": 0,
+        }))
+        .expect("body");
+        let cb = RawCallback {
+            rail: Rail::Wave,
+            headers: vec![("X-Wave-Signature".to_owned(), sign(&sample_secret(), &body))],
+            body,
+        };
+        adapter.verify_signature(&cb).await.expect("verify");
+        match adapter.confirm(&cb).await {
+            Err(PaymentError::InvalidCallback(msg)) => assert!(msg.contains("greater than zero")),
             other => panic!("expected InvalidCallback, got {other:?}"),
         }
     }

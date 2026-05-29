@@ -57,7 +57,7 @@ fn parse_pid(claims_pid: &str) -> Result<Uuid, Box<Response>> {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateOrderBody {
-    pub merchant_id: i64,
+    pub merchant_id: String,
     pub total_xof: i64,
     pub delivery_lat: Option<f64>,
     pub delivery_lng: Option<f64>,

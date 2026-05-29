@@ -14,7 +14,7 @@ default = []
 # Gate the cmake/bindgen C++ build behind this feature.
 # Disable for `--no-default-features` so CI / docs can `cargo check` without
 # cmake or ALSA/ONNX system deps installed.
-speech-core-sys = []
+speech-core-sys = ["dep:bindgen", "dep:cmake"]
 
 # Build the ONNX-backed reference models (Silero VAD, Parakeet STT, Kokoro TTS,
 # DeepFilterNet3) and link libspeech_core_models.a + system onnxruntime.
@@ -46,11 +46,10 @@ hound = "3.5"
 cpal = { version = "0.15", optional = true }
 
 [build-dependencies]
-# cmake and bindgen are always compiled into the build script but their
-# execution is guarded at runtime behind CARGO_FEATURE_SPEECH_CORE_SYS
-# (set by Cargo when the `speech-core-sys` feature is enabled).
-cmake = "0.1"
-bindgen = "0.69"
+# Native speech-core build dependencies are pulled only when
+# `speech-core-sys` is enabled.
+cmake = { version = "0.1", optional = true }
+bindgen = { version = "0.69", optional = true }
 
 [dev-dependencies]
 pretty_assertions.workspace = true

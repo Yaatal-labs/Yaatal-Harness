@@ -26,7 +26,7 @@ impl MigrationTrait for Migration {
                 r#"
 CREATE TABLE IF NOT EXISTS bobo_orders (
     id            BIGSERIAL PRIMARY KEY,
-    merchant_id   BIGINT    NOT NULL,
+    merchant_id   TEXT      NOT NULL,
     buyer_pid     UUID      NOT NULL,
     total_xof     BIGINT    NOT NULL CHECK (total_xof > 0),
     currency      TEXT      NOT NULL DEFAULT 'XOF',

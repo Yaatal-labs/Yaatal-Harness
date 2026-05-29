@@ -98,6 +98,18 @@ impl EventStore for PostgresEventStore {
     ///   with the new status and `updated_at = now()`.
     /// - SELECT and return the updated row.
     async fn record(&self, draft: PaymentEvent) -> Result<PaymentEvent, PaymentError> {
+        if matches!(
+            draft.kind,
+            PaymentEventKind::Settled {
+                status: PaymentStatus::Pending,
+                ..
+            }
+        ) {
+            return Err(PaymentError::InvalidCallback(
+                "settled event cannot carry pending status".to_owned(),
+            ));
+        }
+
         match &draft.kind {
             PaymentEventKind::Initiated => {
                 // Attempt to insert; ignore if the key already exists.

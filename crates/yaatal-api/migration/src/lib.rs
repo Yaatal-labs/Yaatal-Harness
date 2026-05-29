@@ -6,6 +6,9 @@ mod m20260222_000000_create_profiles;
 mod m20260222_000001_add_user_id_to_profiles;
 mod m20260222_000002_create_posts;
 mod m20260222_000003_create_comments;
+mod m20260521_000001_create_products;
+mod m20260521_000002_create_orders;
+mod m20260521_000003_create_order_items;
 mod m20260601_000000_extensions;
 mod m20260615_000001_bobo_orders;
 mod m20260615_000002_bobo_ledger;
@@ -28,6 +31,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260222_000001_add_user_id_to_profiles::Migration),
             Box::new(m20260222_000002_create_posts::Migration),
             Box::new(m20260222_000003_create_comments::Migration),
+            Box::new(m20260521_000001_create_products::Migration),
+            Box::new(m20260521_000002_create_orders::Migration),
+            Box::new(m20260521_000003_create_order_items::Migration),
             // BOBO commerce schema (Lane 5b).
             Box::new(m20260615_000001_bobo_orders::Migration),
             Box::new(m20260615_000002_bobo_ledger::Migration),

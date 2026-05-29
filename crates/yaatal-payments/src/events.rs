@@ -118,9 +118,25 @@ impl InMemoryEventStore {
     }
 }
 
+fn reject_pending_settlement(event: &PaymentEvent) -> Result<(), PaymentError> {
+    if matches!(
+        event.kind,
+        PaymentEventKind::Settled {
+            status: PaymentStatus::Pending,
+            ..
+        }
+    ) {
+        return Err(PaymentError::InvalidCallback(
+            "settled event cannot carry pending status".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 #[async_trait::async_trait]
 impl EventStore for InMemoryEventStore {
     async fn record(&self, draft: PaymentEvent) -> Result<PaymentEvent, PaymentError> {
+        reject_pending_settlement(&draft)?;
         let identity = draft.identity();
         let mut guard = match self.inner.lock() {
             Ok(g) => g,

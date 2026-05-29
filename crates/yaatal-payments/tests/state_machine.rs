@@ -292,8 +292,8 @@ async fn event_log_is_append_only_initiated_then_settled() {
     // One Initiated (key-indexed) + one Settled (currently nil-keyed; see T6
     // limitation note). Both must be present and in insertion order.
     assert_eq!(log.len(), 2, "two distinct events");
-    matches!(log[0].kind, PaymentEventKind::Initiated);
-    matches!(log[1].kind, PaymentEventKind::Settled { .. });
+    assert!(matches!(log[0].kind, PaymentEventKind::Initiated));
+    assert!(matches!(log[1].kind, PaymentEventKind::Settled { .. }));
     assert_eq!(log[0].provider_ref, "WV_LOG_001");
     assert_eq!(log[1].provider_ref, "WV_LOG_001");
     assert!(log[0].recorded_at <= log[1].recorded_at, "monotonic time");

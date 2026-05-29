@@ -61,7 +61,7 @@ fn parse_escrow_state(s: &str) -> Result<EscrowState, CommerceError> {
 #[derive(Debug, Serialize, FromQueryResult)]
 pub struct OrderRow {
     pub id: i64,
-    pub merchant_id: i64,
+    pub merchant_id: String,
     pub buyer_pid: Uuid,
     pub total_xof: i64,
     pub currency: String,
@@ -72,7 +72,7 @@ pub struct OrderRow {
 
 pub async fn create_order(
     db: &DatabaseConnection,
-    merchant_id: i64,
+    merchant_id: String,
     buyer_pid: Uuid,
     total_xof: i64,
     delivery_lat: Option<f64>,
@@ -201,6 +201,18 @@ pub struct EscrowRow {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, FromQueryResult)]
+pub struct PaymentIntentRow {
+    pub order_id: i64,
+    pub rail: String,
+    pub provider_ref: String,
+    pub idempotency_key: Uuid,
+    pub status: String,
+    pub amount_xof: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 pub async fn get_escrow(
     db: &DatabaseConnection,
     order_id: i64,
@@ -245,6 +257,72 @@ pub async fn create_escrow_held(
         from: "(existing escrow)".into(),
         to: "held",
     })
+}
+
+pub async fn create_payment_intent(
+    db: &DatabaseConnection,
+    order_id: i64,
+    rail: &str,
+    provider_ref: &str,
+    idempotency_key: Uuid,
+    status: &str,
+    amount_xof: i64,
+) -> Result<PaymentIntentRow, CommerceError> {
+    ensure_postgres(db)?;
+    if amount_xof <= 0 {
+        return Err(CommerceError::BadInput("amount_xof must be > 0"));
+    }
+    if !matches!(status, "pending" | "succeeded" | "failed" | "reversed") {
+        return Err(CommerceError::BadInput("invalid payment intent status"));
+    }
+
+    let sql = r#"
+        INSERT INTO bobo_payment_intents
+            (order_id, rail, provider_ref, idempotency_key, status, amount_xof)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (idempotency_key) DO UPDATE
+        SET updated_at = now()
+        RETURNING order_id, rail, provider_ref, idempotency_key, status, amount_xof, created_at, updated_at
+    "#;
+
+    PaymentIntentRow::find_by_statement(Statement::from_sql_and_values(
+        DatabaseBackend::Postgres,
+        sql,
+        [
+            order_id.into(),
+            rail.to_owned().into(),
+            provider_ref.to_owned().into(),
+            idempotency_key.into(),
+            status.to_owned().into(),
+            amount_xof.into(),
+        ],
+    ))
+    .one(db)
+    .await?
+    .ok_or(CommerceError::NotFound)
+}
+
+pub async fn get_payment_intent_for_order(
+    db: &DatabaseConnection,
+    order_id: i64,
+) -> Result<PaymentIntentRow, CommerceError> {
+    ensure_postgres(db)?;
+    let sql = r#"
+        SELECT order_id, rail, provider_ref, idempotency_key, status, amount_xof, created_at, updated_at
+        FROM bobo_payment_intents
+        WHERE order_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+    "#;
+
+    PaymentIntentRow::find_by_statement(Statement::from_sql_and_values(
+        DatabaseBackend::Postgres,
+        sql,
+        [order_id.into()],
+    ))
+    .one(db)
+    .await?
+    .ok_or(CommerceError::NotFound)
 }
 
 /// Apply an escrow transition, gated by the pure state machine in

@@ -61,7 +61,11 @@ impl Hooks for App {
             .add_route(controllers::webhooks::routes())
             .add_route(controllers::payments::routes())
             .add_route(controllers::bobo_orders::routes())
+            .add_route(controllers::bobo_checkout::routes())
             .add_route(controllers::bobo_kyc::routes())
+            .add_route(controllers::products::routes())
+            .add_route(controllers::orders::routes())
+            .add_route(controllers::merchant::routes())
             .add_route(controllers::livekit::routes())
     }
 

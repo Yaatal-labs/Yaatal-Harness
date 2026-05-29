@@ -22,7 +22,8 @@ server:
   middlewares:
     cors:
       enable: true
-      allow_origins: any
+      allow_origins:
+        - "*"
       allow_headers:
         - Content-Type
         - Authorization
