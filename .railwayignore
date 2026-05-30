@@ -1,0 +1,26 @@
+# Keep `railway up` uploads lean. The Dockerfile build only needs the Rust
+# workspace; everything below is local tooling/output that bloats the tarball.
+target/
+**/target/
+.git/
+.worktrees/
+.codex-branch-split-backup/
+ml-intern/
+notebooks/
+**/.venv/
+**/__pycache__/
+*.sqlite
+*.sqlite3
+artifacts/
+output/
+results/
+data/
+node_modules/
+.netlify/
+.vscode/
+.agents/
+.local-bin/
+.local-reference/
+.env
+.env.*
+!.env.example

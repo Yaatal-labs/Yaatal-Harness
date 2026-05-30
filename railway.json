@@ -1,25 +1,21 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "builder": "RAILPACK",
-    "buildCommand": "cargo install --path crates/yaatal-api --bin yaatal_api-cli --root /app",
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "Dockerfile",
     "watchPatterns": [
+      "Dockerfile",
+      ".dockerignore",
       "railway.json",
-      ".env.example",
       "Cargo.toml",
       "Cargo.lock",
-      "crates/yaatal-api/**",
-      "crates/yaatal-core/**",
-      "crates/yaatal-feed/**",
-      "crates/yaatal-search/**",
-      "crates/yaatal-voice/**",
-      "migrations/**",
-      "scripts/run-rust-gates.ps1",
-      "scripts/setup-rust-test-env.ps1"
+      "crates/**",
+      "apps/**",
+      "migrations/**"
     ]
   },
   "deploy": {
-    "startCommand": "./bin/yaatal_api-cli start",
+    "startCommand": "/app/yaatal_api-cli start --environment production",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",

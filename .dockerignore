@@ -1,0 +1,39 @@
+# Keep the Docker build context small and reproducible.
+# The image only needs the Rust workspace sources; everything below is local
+# tooling, build output, vendored envs, or worktrees that bloat `COPY . .`.
+
+# Rust build output (regenerated inside the image)
+target/
+**/target/
+
+# Git internals + extra worktrees
+.git/
+.worktrees/
+.codex-branch-split-backup/
+
+# Vendored Python ML tooling (not part of the Rust build)
+ml-intern/
+notebooks/
+**/.venv/
+**/__pycache__/
+
+# Local databases / generated artifacts
+*.sqlite
+*.sqlite3
+artifacts/
+output/
+results/
+data/
+
+# Node / Netlify / editor local state
+node_modules/
+.netlify/
+.vscode/
+.agents/
+.local-bin/
+.local-reference/
+
+# Env files (secrets are injected by Railway, never baked into the image)
+.env
+.env.*
+!.env.example
