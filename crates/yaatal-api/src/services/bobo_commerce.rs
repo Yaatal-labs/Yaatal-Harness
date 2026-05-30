@@ -84,15 +84,8 @@ pub async fn create_order(
     }
 
     let sql = r#"
-        INSERT INTO bobo_orders (merchant_id, buyer_pid, total_xof, state, delivery_location)
-        VALUES (
-            $1, $2, $3, 'created',
-            CASE
-                WHEN $4::float8 IS NOT NULL AND $5::float8 IS NOT NULL
-                THEN ST_SetSRID(ST_MakePoint($5::float8, $4::float8), 4326)::geography
-                ELSE NULL
-            END
-        )
+        INSERT INTO bobo_orders (merchant_id, buyer_pid, total_xof, state, delivery_lat, delivery_lng)
+        VALUES ($1, $2, $3, 'created', $4::float8, $5::float8)
         RETURNING id, merchant_id, buyer_pid, total_xof, currency, state, created_at, updated_at
     "#;
     let row = OrderRow::find_by_statement(Statement::from_sql_and_values(

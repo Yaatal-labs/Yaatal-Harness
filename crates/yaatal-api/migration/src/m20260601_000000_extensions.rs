@@ -13,20 +13,30 @@ impl MigrationName for Migration {
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
         // Skip on SQLite (in-memory test database). Extensions are Postgres-only.
-        if manager.get_database_backend() == sea_orm::DatabaseBackend::Sqlite {
+        if manager.get_database_backend() == DatabaseBackend::Sqlite {
             return Ok(());
         }
-        manager
-            .get_connection()
-            .execute_unprepared(
-                "CREATE EXTENSION IF NOT EXISTS vector; \
-                 CREATE EXTENSION IF NOT EXISTS pg_cron; \
-                 CREATE EXTENSION IF NOT EXISTS postgis; \
-                 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;",
-            )
-            .await
-            .map(|_| ())
+        let conn = manager.get_connection();
+        // Best-effort: these extensions are optional / forward-looking. A managed
+        // Postgres without them (e.g. Railway's stock postgres-ssl image) must
+        // still boot. Probe pg_available_extensions first so a missing extension
+        // never errors and poisons this migration's transaction.
+        for ext in ["vector", "pg_cron", "postgis", "pg_stat_statements"] {
+            let available = conn
+                .query_one(Statement::from_string(
+                    DatabaseBackend::Postgres,
+                    format!("SELECT 1 FROM pg_available_extensions WHERE name = '{ext}'"),
+                ))
+                .await?
+                .is_some();
+            if available {
+                conn.execute_unprepared(&format!("CREATE EXTENSION IF NOT EXISTS {ext};"))
+                    .await?;
+            }
+        }
+        Ok(())
     }
 
     async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {

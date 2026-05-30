@@ -1,7 +1,9 @@
 //! `bobo_orders` — core BOBO commerce order table.
 //!
-//! Uses raw SQL because PostGIS `geography(Point,4326)` cannot be expressed
-//! with the sea-orm schema builder. All statements are idempotent.
+//! Uses raw SQL for the explicit CHECK constraints and DDL. All statements are
+//! idempotent. Delivery coordinates are stored as plain lat/lng columns so the
+//! engine boots on a stock Postgres (no PostGIS dependency); a geo index can be
+//! re-introduced behind PostGIS when geo-search is actually built.
 
 use sea_orm_migration::prelude::*;
 
@@ -39,7 +41,8 @@ CREATE TABLE IF NOT EXISTS bobo_orders (
                                 'cancelled',
                                 'disputed'
                             )),
-    delivery_location  geography(Point, 4326)  NULL,
+    delivery_lat  DOUBLE PRECISION  NULL,
+    delivery_lng  DOUBLE PRECISION  NULL,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
@@ -49,9 +52,6 @@ CREATE INDEX IF NOT EXISTS idx_bobo_orders_merchant_state
 
 CREATE INDEX IF NOT EXISTS idx_bobo_orders_buyer_created
     ON bobo_orders (buyer_pid, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_bobo_orders_delivery_location
-    ON bobo_orders USING GIST (delivery_location);
 "#,
             )
             .await
