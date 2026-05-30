@@ -1,26 +1,35 @@
-# Keep `railway up` uploads lean. The Dockerfile build only needs the Rust
-# workspace; everything below is local tooling/output that bloats the tarball.
-target/
+# Keep `railway up` uploads lean WITHOUT stripping source.
+# NOTE: .railwayignore uses gitignore semantics — an unanchored name like
+# `data/` matches a `data` dir at ANY depth (e.g. crates/yaatal-api/src/data/),
+# which would break the build. Anchor root-only excludes with a leading `/`.
+
+# Big, regenerable, or non-source trees (anchored to repo root)
+/target
+/.git
+/.worktrees
+/.codex-branch-split-backup
+/ml-intern
+/notebooks
+/artifacts
+/output
+/results
+/data
+/node_modules
+/.netlify
+/.vscode
+/.agents
+/.local-bin
+/.local-reference
+
+# Safe to match at any depth (no Rust source collides with these)
 **/target/
-.git/
-.worktrees/
-.codex-branch-split-backup/
-ml-intern/
-notebooks/
 **/.venv/
 **/__pycache__/
+**/node_modules/
 *.sqlite
 *.sqlite3
-artifacts/
-output/
-results/
-data/
-node_modules/
-.netlify/
-.vscode/
-.agents/
-.local-bin/
-.local-reference/
+
+# Secrets are injected by Railway, never uploaded
 .env
 .env.*
 !.env.example

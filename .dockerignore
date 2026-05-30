@@ -1,37 +1,36 @@
-# Keep the Docker build context small and reproducible.
-# The image only needs the Rust workspace sources; everything below is local
-# tooling, build output, vendored envs, or worktrees that bloat `COPY . .`.
+# Keep the Docker build context small WITHOUT stripping source.
+# Anchor root-only excludes with a leading `/` so a name like `data` or `bin`
+# never matches a nested source module (e.g. crates/yaatal-api/src/data/,
+# crates/yaatal-api/src/bin/). Do NOT use bare `**/bin` — it deletes the
+# binary entry point.
 
-# Rust build output (regenerated inside the image)
-target/
+# Big, regenerable, or non-source trees (anchored to repo root)
+/target
+/.git
+/.worktrees
+/.codex-branch-split-backup
+/ml-intern
+/notebooks
+/artifacts
+/output
+/results
+/data
+/node_modules
+/.netlify
+/.vscode
+/.agents
+/.local-bin
+/.local-reference
+
+# Safe to match at any depth (no Rust source collides with these)
 **/target/
-
-# Git internals + extra worktrees
-.git/
-.worktrees/
-.codex-branch-split-backup/
-
-# Vendored Python ML tooling (not part of the Rust build)
-ml-intern/
-notebooks/
 **/.venv/
 **/__pycache__/
-
-# Local databases / generated artifacts
+**/node_modules/
+**/.DS_Store
+**/npm-debug.log
 *.sqlite
 *.sqlite3
-artifacts/
-output/
-results/
-data/
-
-# Node / Netlify / editor local state
-node_modules/
-.netlify/
-.vscode/
-.agents/
-.local-bin/
-.local-reference/
 
 # Env files (secrets are injected by Railway, never baked into the image)
 .env
