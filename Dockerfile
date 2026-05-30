@@ -8,7 +8,9 @@ COPY . .
 RUN cargo build --release -p yaatal-api --bin yaatal_api-cli
 
 # ── Runtime ───────────────────────────────────────────────────────────────────
-FROM debian:bookworm-slim
+# MUST match the builder's Debian release (rust:1.90-slim is Trixie). A bookworm
+# runtime ships GLIBC 2.36 and cannot exec a Trixie-built binary (GLIBC 2.38+).
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y ca-certificates libssl3 && rm -rf /var/lib/apt/lists/*
 
