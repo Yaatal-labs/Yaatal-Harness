@@ -15,6 +15,7 @@ mod m20260615_000002_bobo_ledger;
 mod m20260615_000003_bobo_escrow;
 mod m20260615_000004_bobo_kyc;
 mod m20260615_000005_bobo_payment_intents;
+mod m20260616_000000_fix_profiles_user_id_type;
 
 pub struct Migrator;
 
@@ -40,6 +41,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260615_000003_bobo_escrow::Migration),
             Box::new(m20260615_000004_bobo_kyc::Migration),
             Box::new(m20260615_000005_bobo_payment_intents::Migration),
+            // Fix profiles.user_id type (uuid -> text) on already-deployed Postgres.
+            Box::new(m20260616_000000_fix_profiles_user_id_type::Migration),
             // inject-above (do not remove this comment)
         ]
     }
