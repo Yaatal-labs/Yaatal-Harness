@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yaatal Engine — Manifeste</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+  :root{
+    --paper:#faf8f1; --card:#fffefb; --ink:#171511; --soft:#514c43; --faint:#8d8578;
+    --line:#e7dfcf; --line-soft:#f1ebdf;
+    --v1:#2f7d5e;   --v1-bg:#e8f4ee;
+    --road:#365fa4; --road-bg:#e8eef8;
+    --vis:#6252a3;  --vis-bg:#eeebf8;
+    --warn:#a2731f; --warn-bg:#f7eed8;
+    --rust:#b44c34; --rust-bg:#f8e9e4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;line-height:1.58;padding:50px 20px 110px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1060px;margin:0 auto}
+  a{color:var(--road);text-decoration:none}a:hover{text-decoration:underline}
+  code{font-family:'IBM Plex Mono',monospace;font-size:.88em;background:var(--line-soft);padding:1px 5px;border-radius:4px;color:var(--ink)}
+  .kick{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .kick i{width:7px;height:7px;border-radius:50%;background:var(--rust);display:inline-block}
+  h1{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(38px,7vw,68px);line-height:.97;letter-spacing:-.02em;margin-bottom:18px}
+  .lede{font-size:clamp(15px,1.9vw,19px);color:var(--soft);max-width:800px;border-left:3px solid var(--rust);padding-left:18px;margin-bottom:18px;font-style:italic}
+  .banner{background:#171511;color:#ece7da;border-radius:13px;padding:18px 22px;font-size:14px;line-height:1.6;margin-bottom:14px}
+  .banner b{color:#fff}.banner .v1{color:#8fd9b6}.banner .road{color:#9dbcf3}.banner .vis{color:#c4b9f5}
+  .stamp{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint);display:flex;gap:18px;flex-wrap:wrap}
+  hr{border:0;border-top:1px solid var(--line);margin:42px 0 30px}
+  h2{font-family:'Fraunces',serif;font-size:13px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+  h2 .n{color:#cfc7b6;margin-right:9px}
+  h2 + .note{font-size:13.5px;color:var(--soft);margin-bottom:22px;max-width:780px}
+  .pill{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.05em;padding:2px 8px;border-radius:5px;white-space:nowrap}
+  .pill.v1{color:var(--v1);background:var(--v1-bg)}.pill.road{color:var(--road);background:var(--road-bg)}
+  .pill.vis{color:var(--vis);background:var(--vis-bg)}.pill.warn{color:var(--warn);background:var(--warn-bg)}
+  .lyr{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;padding:2px 7px;border-radius:4px;border:1px solid var(--line);color:var(--faint);background:var(--paper)}
+  .legend{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media(max-width:720px){.legend{grid-template-columns:1fr}}
+  .leg{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:15px 17px}
+  .leg .h{display:flex;align-items:center;gap:9px;margin-bottom:7px}.leg h3{font-family:'Fraunces',serif;font-size:16px;font-weight:600}.leg p{font-size:12.7px;color:var(--soft)}
+  .breath{background:#171511;color:#ece7da;border-radius:14px;padding:24px 26px;font-size:15px;line-height:1.65}
+  .breath b{color:#fff}.breath .tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#b6b0a3;display:block;margin-bottom:11px}
+  .flow{background:#171511;color:#eee8dc;border-radius:14px;padding:22px 24px;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.95;overflow-x:auto}
+  .flow .a{color:#c4b9f5}.flow .e{color:#8fd9b6}.flow .h{color:#9dbcf3}.flow .p{color:#e5bd68}.flow .d{color:#9d958a}.flow .rd{color:#eba18f}
+  .rules{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:14px}
+  @media(max-width:780px){.rules{grid-template-columns:1fr}}
+  .rule{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .rule .t{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--rust);margin-bottom:7px}.rule p{font-size:12.5px;color:var(--soft)}
+  .dir{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:680px){.dir{grid-template-columns:1fr}}
+  .dcell{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:17px 19px}
+  .dcell h4{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin-bottom:6px}.dcell p{font-size:13px;color:var(--soft)}
+  .choice{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:20px 22px;margin-bottom:12px}
+  .choice .hd{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .choice .id{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--faint)}
+  .choice h3{font-family:'Fraunces',serif;font-size:19px;font-weight:600;margin-right:auto}
+  .rows{display:grid;grid-template-columns:82px 1fr;gap:8px 15px;align-items:start}
+  @media(max-width:560px){.rows{grid-template-columns:1fr;gap:2px 0}.rows .lab{margin-top:10px}}
+  .rows .lab{font-family:'IBM Plex Mono',monospace;font-size:9.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding-top:3px}
+  .rows .lab.what{color:var(--faint)}.rows .lab.why{color:var(--v1)}.rows .lab.rej{color:var(--warn)}.rows .lab.not{color:var(--rust)}.rows .lab.st{color:var(--road)}
+  .rows .v{font-size:13.4px;color:var(--soft)}.rows .v b{color:var(--ink)}
+  .tracks{display:grid;grid-template-columns:1fr 1fr;gap:13px}@media(max-width:680px){.tracks{grid-template-columns:1fr}}
+  .track{border:1px solid var(--line);border-radius:13px;padding:20px 22px;background:var(--card)}
+  .track .tg{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:5px;display:inline-block;margin-bottom:11px}
+  .track.a .tg{color:var(--v1);background:var(--v1-bg)}.track.b .tg{color:var(--road);background:var(--road-bg)}
+  .track h3{font-family:'Fraunces',serif;font-size:17px;margin-bottom:8px}.track p{font-size:13px;color:var(--soft)}
+  .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+  table{border-collapse:collapse;width:100%;min-width:680px}
+  th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);padding:12px 14px;font-size:12.6px;line-height:1.5}
+  th:last-child,td:last-child{border-right:0}tbody tr:last-child td{border-bottom:0}
+  th{background:#f5f0e7;color:var(--faint);font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}
+  td b{color:var(--ink)}.cat{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;color:var(--road)}
+  .buckets{display:grid;grid-template-columns:repeat(3,1fr);gap:13px}@media(max-width:820px){.buckets{grid-template-columns:1fr}}
+  .bk{border:1px solid var(--line);border-radius:13px;background:var(--card);overflow:hidden}
+  .bk .top{padding:13px 18px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--line-soft)}.bk .top h3{font-family:'Fraunces',serif;font-size:16px;font-weight:600}
+  .bk.v1 .top{background:var(--v1-bg)}.bk.road .top{background:var(--road-bg)}.bk.vis .top{background:var(--vis-bg)}
+  .bk ul{list-style:none;padding:14px 18px}.bk li{font-size:12.7px;color:var(--soft);padding-left:15px;position:relative;margin-bottom:8px}
+  .bk li::before{content:"▸";position:absolute;left:0;font-size:10px;top:2px}
+  .bk.v1 li::before{color:var(--v1)}.bk.road li::before{color:var(--road)}.bk.vis li::before{color:var(--vis)}
+  .clocks{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:680px){.clocks{grid-template-columns:1fr}}
+  .clock{border:1px solid var(--line);border-radius:13px;padding:20px 22px;background:var(--card)}
+  .clock .cg{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:5px;display:inline-block;margin-bottom:11px}
+  .clock.fast .cg{color:var(--v1);background:var(--v1-bg)}.clock.slow .cg{color:var(--vis);background:var(--vis-bg)}
+  .clock h3{font-family:'Fraunces',serif;font-size:17px;margin-bottom:8px}.clock p{font-size:13px;color:var(--soft)}
+  .oneliner{font-family:'Fraunces',serif;font-size:clamp(17px,2.4vw,22px);font-weight:600;line-height:1.35;border-left:3px solid var(--warn);padding-left:18px;margin:22px 0 4px}
+  footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kick"><i></i> Yaatal Engine · Manifeste de conception · état R&amp;D</div>
+  <h1>Aucun choix n'est<br>aléatoire dans l'Engine.</h1>
+  <p class="lede">Ce qu'est chaque sous-système, pourquoi il a été choisi, ce qui a été écarté, ce qu'il n'est délibérément pas — pour que l'intention survive au code.</p>
+  <div class="banner">
+    <b>Cadre honnête.</b> Aujourd'hui Yaatal est un <b>projet de R&amp;D doté d'une colonne vertébrale de qualité production.</b> Ce document étiquette
+    <span class="v1">■ V1</span> = réel &amp; livrable maintenant · <span class="road">■ ROADMAP</span> = conçu / partiel / à suivre · <span class="vis">■ VISION</span> = conditionné par la recherche. La feuille de route détaillée est disséquée dans une passe d'inventaire séparée — ici, on ne fait que classer.
+  </div>
+  <div class="stamp"><span>ÉTAT · 2026-06-06</span><span>COUCHES · Apps → Engine → Harness</span><span>1ʳᵉ APP · BOBO</span></div>
+
+  <hr>
+  <h2><span class="n">00</span> En une phrase</h2>
+  <div class="breath">
+    <span class="tag">La thèse</span>
+    Yaatal est une <b>plateforme d'IA souveraine, edge-vers-cloud, pour le commerce et l'assistance africains (wolof/français d'abord)</b>, conçue contraintes-d'abord — téléphones bon marché, réseaux faibles, batterie, parole code-mixée, peu de données, argent sensible à la confiance. Sa primitive fondatrice : <b>les modèles proposent, l'Engine dispose</b> — l'IA peut <i>suggérer</i> une action, mais seul l'Engine typé-souveraineté transforme l'intention en effet réel (argent, commandes, données personnelles), et les données <code>Sovereign</code> sont garanties <b>à la compilation</b> de ne jamais quitter le Sénégal. BOBO est la première surface applicative, pas la finalité.
+  </div>
+
+  <hr>
+  <h2><span class="n">01</span> L'architecture en couches — à lire en premier</h2>
+  <p class="note">Yaatal n'est <b>pas un monolithe</b> — trois couches plus une voie de R&amp;D. Ce manifeste est la vue <b>Engine (runtime)</b> ; le Harness a la sienne. Dépendance à sens unique : <b>l'Engine dépend du Harness, pas l'inverse.</b></p>
+  <div class="flow">
+<span class="a">APPS</span>      BOBO · YOKK · NJOOBA · DAARA      UX produit &amp; parcours        <span class="d">[par app]</span><br>
+  &#9474;  appelle HTTPS/JSON + JWT   &#8592; le SDK @yaatal/client vit ici   <span class="h">[ROADMAP]</span><br>
+  &#9660;<br>
+<span class="e">ENGINE</span>    runtime / plan de contrôle        auth · session · profil ·    <span class="e">[colonne V1]</span><br>
+  &#9474;                                    routes · déploiement · « dispose »<br>
+  &#9474;  invoque des contrats Rust en-process<br>
+  &#9660;<br>
+<span class="h">HARNESS</span>   couche de capacités IA            modèles · search · mémoire · <span class="d">[échafaudage]</span><br>
+  &#9474;  (le Runtime Harness embarque DANS l'Engine)  outils · policy · evals · voix<br>
+  &#9660;<br>
+<span class="p">PROVIDERS</span> modèles · search · voix · outils                               <span class="rd">[R&amp;D]</span><br>
+<br>
+          <span class="rd">R&amp;D HARNESS</span> &#8212; prouve / évalue / durcit, puis promeut &#8212;&#9488;  <span class="rd">[R&amp;D]</span><br>
+          (notebooks, entraînement, datasets &#8212; ne part PAS en prod) &#9496;
+  </div>
+  <div class="rules">
+    <div class="rule"><div class="t">Dépendance</div><p>L'Engine fournit le contexte utilisateur/session/profil vérifié et appelle les pipelines du Harness via des contrats Rust explicites.</p></div>
+    <div class="rule"><div class="t">Frontières</div><p>Le Harness ne possède jamais auth/profil/transport/routes/déploiement. L'Engine ne possède jamais l'UX d'une app. Les apps ne dupliquent jamais la logique de fiabilité IA.</p></div>
+    <div class="rule"><div class="t">Promotion</div><p>Une app en a besoin → app. Deux apps → Engine. IA non prouvée → R&amp;D Harness. Fiabilité IA prouvée → Runtime Harness.</p></div>
+  </div>
+  <p class="note" style="margin-top:16px"><b>Alignement en cours :</b> le dépôt Engine garde ses propres copies des crates de capacités (<code>ai</code>, <code>search</code>, <code>feed</code>, <code>voice</code>). Cible : possédées par le Harness, consommées par l'Engine. Les collisions de noms + le sens de dépendance sont une tâche active, pas l'état final.</p>
+
+  <hr>
+  <h2><span class="n">02</span> Légende des statuts</h2>
+  <div class="legend">
+    <div class="leg"><div class="h"><span class="pill v1">V1</span><h3>Réel &amp; livrable</h3></div><p>En ligne ou trivialement vérifiable aujourd'hui. La colonne.</p></div>
+    <div class="leg"><div class="h"><span class="pill road">ROADMAP</span><h3>Conçu / partiel / à suivre</h3></div><p>Clairement à venir, pas encore réel.</p></div>
+    <div class="leg"><div class="h"><span class="pill vis">VISION</span><h3>Conditionné par la recherche</h3></div><p>Aspirationnel ; conditionné par une recherche difficile et incertaine (le programme de modèles).</p></div>
+  </div>
+
+  <hr>
+  <h2><span class="n">03</span> Directives primordiales</h2>
+  <div class="dir">
+    <div class="dcell"><h4>Frontières de couches</h4><p>Apps / Engine / Harness, dépendance à sens unique. Empêche la plateforme de devenir trois systèmes concurrents ; les capacités sont prouvées en R&amp;D et promues une fois durcies.</p></div>
+    <div class="dcell"><h4>La souveraineté est un type, pas un réglage</h4><p>La résidence au Sénégal / Diamniadio doit être incontournable. Dans le système de types, le compilateur est l'auditeur.</p></div>
+    <div class="dcell"><h4>Économie &amp; réseaux africains d'abord</h4><p>Calcul facturé, bande passante chère/intermittente, appareils contraints. Préférer local/edge/bon-marché avant frontier/cloud ; se dégrader proprement.</p></div>
+    <div class="dcell"><h4>Promotion plutôt que duplication</h4><p>App → Engine → Runtime Harness est un cliquet à sens unique mérité par la preuve, pas le copier-coller. Rien de codé en dur dans Rust.</p></div>
+  </div>
+
+  <hr>
+  <h2><span class="n">04</span> Manifeste des sous-systèmes — choix par choix</h2>
+
+  <div class="choice"><div class="hd"><span class="id">4.1</span><h3>Loco — « Rust on Rails »</h3><span class="lyr">Engine</span><span class="pill v1">V1</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v">Framework web Rust tout-en-un : routage, sea-orm, workers, mailers, auth JWT.</div>
+    <div class="lab why">Pourquoi</div><div class="v">Livrer du produit, pas de la plomberie, dans un langage sûr en mémoire, sans GC, à faible empreinte ; les types de Rust rendent possible la colonne souveraineté.</div>
+    <div class="lab rej">Écarté</div><div class="v">Axum à partir de zéro (verbeux) ; Node/Python (empreinte, GC, garanties faibles).</div>
+    <div class="lab not">N'est pas</div><div class="v">Un essaim de microservices. Un binaire runtime unique.</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.2</span><h3>Système de types de souveraineté</h3><span class="lyr">Cœur partagé</span><span class="pill v1">V1</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v"><code>Sensitivity { Sovereign · Operational · Public }</code>, un <code>SensitivityTag</code> <b>scellé</b>, un <code>Tagged&lt;T,S&gt;</code> à type fantôme. Sovereign = reste dans le Postgres de Diamniadio, ne se réplique jamais vers l'edge.</div>
+    <div class="lab why">Pourquoi</div><div class="v">La résidence est un invariant de premier ordre ; le scellage transforme une mauvaise classification en <b>erreur de compilation</b>.</div>
+    <div class="lab rej">Écarté</div><div class="v">Vérifications à l'exécution / drapeaux de config (contournables, dérive, échec ouvert).</div>
+    <div class="lab not">N'est pas</div><div class="v">Une case à cocher RGPD.</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.3</span><h3>Stockage gardé par étiquette</h3><span class="lyr">Cœur partagé</span><span class="pill v1">V1</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v"><code>StorageDispatcher&lt;T,S&gt;</code> sur memory · postgres · r2. <b>R2 n'implémente que <code>…&lt;T,Public&gt;</code></b> — un <code>Tagged&lt;T,Sovereign&gt;</code> vers R2 ne compile pas.</div>
+    <div class="lab why">Pourquoi</div><div class="v">L'edge est Public par construction ; les données souveraines ne peuvent physiquement pas y être routées.</div>
+    <div class="lab not">N'est pas</div><div class="v">Un endroit d'où les données souveraines s'échappent vers le CDN.</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.4</span><h3>Persistance — sea-orm + migrations</h3><span class="lyr">Engine</span><span class="pill v1">V1</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v">Modèles typés, migrations-en-code, appliquées au démarrage.</div>
+    <div class="lab why">Pourquoi</div><div class="v">Schéma versionné, relisible, auto-appliqué ; pas de DDL manuel en prod.</div>
+    <div class="lab not">N'est pas</div><div class="v">Sûr contre la dérive par accident. <b>Cicatrice :</b> une colonne <code>uuid</code> liée comme <code>String</code> passait tous les tests SQLite et renvoyait 500 en Postgres (42804/42883) ; corrigé <code>uuid→text</code>. Vert-SQLite ≠ vert-Postgres.</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.5</span><h3>Auth · commerce · identité de profil</h3><span class="lyr">Engine</span><span class="pill v1">V1</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v">Auth JWT, résolution de profil, pont commerce BOBO (commandes, checkout, KYC, séquestre, marchand).</div>
+    <div class="lab why">Pourquoi</div><div class="v">C'est la moitié « dispose » — contexte vérifié + exécution qui valide avant que quoi que ce soit de réel n'arrive. Le bon domicile pour les futures actions proposées par l'IA.</div>
+    <div class="lab not">N'est pas</div><div class="v">De l'UX applicative — primitives agnostiques (le pont BOBO nommé est la seule couture délibérée).</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.6</span><h3>Paiements</h3><span class="lyr">Engine</span><span class="pill warn">V1 partiel</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v">Contrat normalisé + RailSelector + EventStore idempotent + routeur de webhooks. <b>Wave réel</b> (HMAC-SHA256) ; les autres renvoient <code>RailNotConfigured</code>.</div>
+    <div class="lab why">Pourquoi</div><div class="v">La fragmentation des paiements africains derrière un seul contrat ; webhooks idempotents.</div>
+    <div class="lab st">Roadmap</div><div class="v"><code>bobo_checkout</code> écrit les intentions en SQL brut — deux chemins à converger.</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.7</span><h3>LiveKit — plan de contrôle temps réel</h3><span class="lyr">Engine</span><span class="pill warn">V1 contrôle / ROADMAP média</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v">L'Engine émet des jetons + reçoit des webhooks ; le média circule client ↔ SFU. Non configuré → 503.</div>
+    <div class="lab why">Pourquoi</div><div class="v">L'Engine possède l'auth/contrôle, pas le chemin média (latence/coût/échelle).</div>
+    <div class="lab not">N'est pas</div><div class="v">Un serveur média.</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.8</span><h3>Routeur IA en cascade</h3><span class="lyr">Harness (dans l'Engine aujourd'hui)</span><span class="pill warn">V1 orchestration / ROADMAP inférence</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v">Routeur 5-tiers piloté par données (Tier 1 on-device → SiliconFlow → OpenRouter → HF) via <code>reqwest</code>. Gardes : disjoncteur · gate réseau · limiteur de débit · classification (FR/EN) · routage par sensibilité.</div>
+    <div class="lab why">Pourquoi</div><div class="v">Coût + souveraineté + résilience — le moins cher/local d'abord, le frontier en dernier ; prompts sensibles hors clouds tiers ; se dégrader, pas planter/dépenser. Providers interchangeables.</div>
+    <div class="lab st">État</div><div class="v">L'orchestration est réelle mais <b>ne fait aucune inférence</b> ; le Tier 1 est un placeholder (« …GGUF local en E7 ») ; sans clés → <code>AllTiersExhausted</code>. Domicile cible : Harness.</div>
+    <div class="lab not">N'est pas</div><div class="v">Un simple proxy — un routeur résilient, conscient des politiques et du réseau.</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.9</span><h3>Search · Feed · Voix</h3><span class="lyr">Harness (dans l'Engine aujourd'hui)</span><span class="pill warn">mixte</span></div>
+    <div class="rows"><div class="lab st">Search</div><div class="v"><span class="pill warn">V1 partiel</span> <code>/search</code> + <code>/index/upsert</code> sur BGE-M3 + Qdrant ; profils <code>canonical-1024 · edge-512/256/128</code>. La pièce IA la plus réelle.</div>
+    <div class="lab st">Feed</div><div class="v"><span class="pill road">ROADMAP</span> pipeline étagé <code>sources→filters→scorers→hydrators→selectors</code> — échafaudage.</div>
+    <div class="lab st">Voix</div><div class="v"><span class="pill road">ROADMAP</span> sessions WebSocket, <b>mock</b> compatible PersonaPlex ; parole réelle derrière <code>speech-core-sys</code> (désactivé par défaut).</div></div></div>
+
+  <div class="choice"><div class="hd"><span class="id">4.10</span><h3>Capacités natives du Harness</h3><span class="lyr">Harness</span><span class="pill road">ROADMAP</span></div>
+    <div class="rows"><div class="lab what">Quoi</div><div class="v"><code>models · tools · memory · policy · evals · observability</code> — contrats (<code>Retriever, Ranker, PolicyEngine, ModelAdapter, RequestContext</code>) + échafaudage/mocks. Le cerveau IA réutilisable que l'Engine appellera ; implémentations réelles promues hors R&amp;D à mesure du durcissement.</div></div></div>
+
+  <hr>
+  <h2><span class="n">05</span> Le programme de modèles <span class="pill vis" style="vertical-align:middle">VISION · R&amp;D</span></h2>
+  <p class="note">Intelligence on-device/edge — <b>stade recherche, pas en production.</b> Le côté « propose » que l'Engine « dispose ». La conception n'est pas aléatoire : la <b>couture texte</b> (STT→texte→MT→texte→TTS) est préférée au S2ST opaque pour l'auditabilité ; des <b>ancres réelles + ponts synthétiques</b> avec porte de revue humaine comblent le manque de données ; le <b>fossé de données wolof du commerce</b> est l'avantage de long terme.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Voie</th><th>Modèle</th><th>Rôle</th><th>État</th></tr></thead>
+    <tbody>
+      <tr><td>Voix edge</td><td><b>LFM2.5-Audio</b></td><td>audio → tool-call / JSON strict, sur téléphone</td><td>smoke R&amp;D</td></tr>
+      <tr><td>ASR streaming</td><td><b>Nemotron 3.5 ASR</b></td><td>transcription wolof/français/code-mix</td><td>adaptation R&amp;D</td></tr>
+      <tr><td>Duplex</td><td><b>NeMo SpeechLM2 / SALM</b></td><td>S2S full-duplex</td><td>R&amp;D précoce</td></tr>
+      <tr><td>Traduction</td><td><b>Wolof-NMT / NLLB</b></td><td>texte cible FR↔WO (couture auditable)</td><td>génération + revue</td></tr>
+      <tr><td>TTS</td><td><b>xTTS-v2-wolof / FR</b></td><td>parole cible</td><td>synthétique, sous revue</td></tr>
+      <tr><td>Recherche</td><td><b>BGE-M3 Matryoshka</b></td><td>search / mémoire</td><td>partiellement réel (§4.9)</td></tr>
+      <tr><td>Multimodal cloud</td><td><b>Nemotron Nano / Omni</b></td><td>raisonnement lourd, évaluateur</td><td>prompt/eval d'abord</td></tr>
+    </tbody>
+  </table></div>
+
+  <hr>
+  <h2><span class="n">06</span> On-device — phase E7 <span class="pill road" style="vertical-align:middle">ROADMAP</span></h2>
+  <div class="tracks">
+    <div class="track a"><span class="tg">Voie A · côté engine</span><h3>Inférence souveraine auto-hébergée</h3><p>Combler le placeholder Tier-1 pour que les prompts <code>Sovereign</code> soient répondus sans quitter Diamniadio. Runtime : candle / llama-cpp-2 / mistral.rs / ort ; petit GGUF quantifié ; sous feature-flag ; budget RAM/CPU. <b>Gain :</b> l'inférence sensible ne touche jamais un cloud étranger.</p></div>
+    <div class="track b"><span class="tg">Voie B · côté app</span><h3>Vraie inférence côté téléphone</h3><p>Un modèle sur l'appareil de l'utilisateur dans BOBO natif (ExecuTorch / MLC / llama.rn) — offline-first, le tier littéralement le moins cher ; l'Engine devient le repli cloud. <b>Travail app, pas Engine.</b> Là où atterrit LFM2.5-Audio.</p></div>
+  </div>
+
+  <hr>
+  <h2><span class="n">07</span> Où cela se situe — catégorisation industrielle</h2>
+  <div class="tbl"><table>
+    <thead><tr><th style="width:32%">Surface Engine</th><th style="width:34%">Catégorie industrielle</th><th>Voisins (forme, pas parité)</th></tr></thead>
+    <tbody>
+      <tr><td><b>Auth · données · stockage · workers</b></td><td><span class="cat">BaaS / backend d'app</span></td><td>Supabase, Appwrite, Firebase</td></tr>
+      <tr><td><b>Cascade 5-tiers</b></td><td><span class="cat">Passerelle IA / routeur LLM</span></td><td>OpenRouter, LiteLLM, Portkey</td></tr>
+      <tr><td><b>Types souveraineté + stockage gardé</b></td><td><span class="cat">Résidence des données / policy-as-code</span></td><td>OPA (mais à la compilation)</td></tr>
+      <tr><td><b>Pont commerce</b></td><td><span class="cat">Commerce headless</span></td><td>Medusa, Saleor</td></tr>
+      <tr><td><b>Search · Paiements · LiveKit</b></td><td><span class="cat">Recherche vectorielle · orch. paiements · contrôle CPaaS</span></td><td>Qdrant · Spreedly · LiveKit</td></tr>
+    </tbody>
+  </table></div>
+  <p class="oneliner">Un « Firebase souverain pour l'IA africaine » — résidence des données compilée, plus un plan de contrôle d'actions-IA qu'aucun BaaS prêt-à-l'emploi n'offre.</p>
+
+  <hr>
+  <h2><span class="n">08</span> L'inventaire V1 / Roadmap / Vision</h2>
+  <p class="note">Classement uniquement — la feuille de route détaillée est disséquée dans une passe de revue/inventaire séparée.</p>
+  <div class="buckets">
+    <div class="bk v1"><div class="top"><span class="pill v1">V1</span><h3>Réel &amp; livrable</h3></div><ul>
+      <li>Runtime Engine en ligne sur Railway : auth, profil, commerce/produits/commandes, persistance (DB privée), vérifié de bout en bout.</li>
+      <li>Types de souveraineté + stockage gardé par étiquette (garanti à la compilation).</li>
+      <li><i>Orchestration</i> IA en cascade (a besoin de clés), recherche <i>exécutable</i> (sidecar+Qdrant), paiements Wave.</li>
+    </ul></div>
+    <div class="bk road"><div class="top"><span class="pill road">ROADMAP</span><h3>Conçu / à suivre</h3></div><ul>
+      <li>SDK <code>@yaatal/client</code> → spin en une commande → <code>create-yaatal-app</code>.</li>
+      <li>Alignement Engine↔Harness (dépendance, dé-dup crates, promotion des capacités).</li>
+      <li>Tier-1 on-device (E7-A), feed, voix réelle, convergence paiements, LiveKit, verrou CORS, email/SMTP, build BOBO natif.</li>
+    </ul></div>
+    <div class="bk vis"><div class="top"><span class="pill vis">VISION</span><h3>Conditionné recherche</h3></div><ul>
+      <li>Pile vocale-commerce souveraine wolof/français (voix → ASR → traduction → TTS → duplex).</li>
+      <li>Le fossé de données en langue peu dotée, qui se compose dans le temps.</li>
+      <li>SaaS multi-locataire, multi-région/PRA, « backend IA souverain pour les bâtisseurs africains ».</li>
+    </ul></div>
+  </div>
+
+  <hr>
+  <h2><span class="n">09</span> Les deux horloges — comment lire tout ce qui précède</h2>
+  <div class="clocks">
+    <div class="clock fast"><span class="cg">Rapide · livrable maintenant</span><h3>Horloge plateforme</h3><p>Engine → SDK → spin → scaffold, qui se compose aujourd'hui. Utilise l'IA cloud prête-à-l'emploi pour la valeur produit à court terme. <b>C'est le chemin le plus rapide.</b></p></div>
+    <div class="clock slow"><span class="cg">Lente · haut plafond</span><h3>Horloge recherche</h3><p>Le programme de modèles wolof souverains. Dé-risquée dans le R&amp;D Harness, promue seulement une fois durcie.</p></div>
+  </div>
+  <div class="breath" style="margin-top:18px"><span class="tag">La lecture</span>L'architecture (R&amp;D Harness + règle de promotion) est <b>littéralement conçue pour faire tourner les deux horloges sans les fusionner.</b> Livrer la colonne sur l'horloge plateforme ; laisser le plafond arriver sur l'horloge recherche. <b>Aujourd'hui : un projet de R&amp;D doté d'une colonne de qualité production et d'une thèse de recherche défendable</b> — une position rare et forte, tant que le cadrage reste honnête.</div>
+
+  <footer>
+    YAATAL ENGINE · MANIFESTE DE CONCEPTION · 2026-06-06 · complément de ENGINE-MANIFEST.fr.md / .md<br>
+    Maintenu aux côtés du code. Si un choix ici cesse de correspondre aux dépôts, le code l'emporte — mettre à jour dans le même changement.<br>
+    Source de vérité : README.md · SPRINT-LOG.md · CLAUDE.md · docs Yaatal-Harness
+  </footer>
+
+</div>
+</body>
+</html>
