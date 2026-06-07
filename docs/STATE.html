@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yaatal — State of the Project</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+  :root{--paper:#faf8f1;--card:#fffefb;--ink:#171511;--soft:#514c43;--faint:#8d8578;--line:#e7dfcf;--line-soft:#f1ebdf;
+    --g:#2f7d5e;--g-bg:#e8f4ee;--b:#365fa4;--b-bg:#e8eef8;--v:#6252a3;--v-bg:#eeebf8;--w:#a2731f;--w-bg:#f7eed8;--r:#b44c34;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',sans-serif;line-height:1.58;padding:50px 20px 100px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto}
+  code{font-family:'IBM Plex Mono',monospace;font-size:.88em;background:var(--line-soft);padding:1px 5px;border-radius:4px}
+  .kick{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .kick i{width:7px;height:7px;border-radius:50%;background:var(--r)}
+  h1{font-family:'Fraunces',serif;font-weight:900;font-size:clamp(34px,6.5vw,60px);line-height:1.0;letter-spacing:-.02em;margin-bottom:16px}
+  .lede{font-size:clamp(14px,1.8vw,17px);color:var(--soft);max-width:760px;border-left:3px solid var(--r);padding-left:18px;margin-bottom:14px;font-style:italic}
+  .stamp{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint)}
+  .lang{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--r);margin:46px 0 8px;display:flex;align-items:center;gap:10px}
+  .lang::after{content:"";flex:1;height:1px;background:var(--line)}
+  hr{border:0;border-top:1px solid var(--line);margin:34px 0 26px}
+  h2{font-family:'Fraunces',serif;font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin-bottom:12px}
+  h2 .e{margin-right:8px}
+  ul{list-style:none}
+  li{font-size:13.5px;color:var(--soft);padding-left:16px;position:relative;margin-bottom:8px}
+  li::before{content:"▸";position:absolute;left:0;font-size:10px;top:2px;color:var(--b)}
+  li b{color:var(--ink)}
+  .pivots li::before{content:counter(p)".";counter-increment:p;color:var(--r);font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;left:-2px}
+  .pivots{counter-reset:p}
+  .breath{background:#171511;color:#ece7da;border-radius:13px;padding:20px 24px;font-size:14.5px;line-height:1.65}
+  .breath b{color:#fff}
+  .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-top:6px}
+  table{border-collapse:collapse;width:100%;min-width:620px}
+  th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line-soft);border-right:1px solid var(--line-soft);padding:11px 14px;font-size:12.6px;line-height:1.5}
+  th:last-child,td:last-child{border-right:0}tbody tr:last-child td{border-bottom:0}
+  th{background:#f5f0e7;color:var(--faint);font-family:'IBM Plex Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+  td b{color:var(--ink)}
+  .vis{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
+  @media(max-width:680px){.vis{grid-template-columns:1fr}}
+  .vc{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:15px 17px}
+  .vc .t{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--r);margin-bottom:7px}
+  .vc p{font-size:13px;color:var(--soft)}.vc b{color:var(--ink)}
+  footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--faint);line-height:1.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="kick"><i></i> Yaatal · State of the Project</div>
+  <h1>Stage · Pivots ·<br>Model Choices · Vision</h1>
+  <p class="lede">Where Yaatal stands and why — a fixed reference snapshot. Bilingual EN / FR.</p>
+  <div class="stamp">SNAPSHOT · 2026-06-07 · companion to ENGINE-MANIFEST &amp; docs/plans</div>
+
+  <div class="lang">🇬🇧 English</div>
+
+  <h2><span class="e">🟢</span> Stage — where it is now</h2>
+  <p style="font-size:13.5px;color:var(--soft);margin-bottom:10px">An <b>R&amp;D project with a production-grade spine</b> — two clocks in parallel:</p>
+  <ul>
+    <li><b>Platform (live):</b> Engine on Railway (auth/commerce/products verified end-to-end, private DB, seeded catalog, prod uuid-bug fixed); BOBO web on Cloudflare; full frontend → engine → Postgres round-trip proven.</li>
+    <li><b>Structure (formalized):</b> two-repo split — <b>Engine</b> (runtime/control plane) + <b>Harness</b> (AI capabilities); alignment in progress.</li>
+    <li><b>Recently shipped:</b> bilingual manifests (MD+HTML), inventory + SDK/BOBO slice plans, bilingual onboarding, and the <code>@njooba</code>→<code>@yaatal</code> rebrand (web-build verified).</li>
+    <li><b>Research (R&amp;D):</b> the sovereign Wolof model stack — not yet in production.</li>
+  </ul>
+
+  <hr>
+  <h2><span class="e">🔀</span> Pivots — the directional decisions</h2>
+  <ul class="pivots">
+    <li><b>PowerSync → Engine HTTP</b> — BOBO commerce off offline-sync; PowerSync now dead weight.</li>
+    <li><b>App backend → app-agnostic platform</b> — the Engine is a product, not BOBO's backend.</li>
+    <li><b>Monolith → layered</b> — capabilities split into the Harness; Engine = runtime/control plane.</li>
+    <li><b>NJOOBA → Yaatal</b> — the seed isn't the umbrella; neutral shared scope.</li>
+    <li><b>Direct cloud AI → cascade + sovereignty</b> — provider-agnostic, edge-first, compile-time residency.</li>
+    <li><b>Three backends → consolidate on Engine</b> (in progress) — commerce on Engine; chat/delivery + payments flagged.</li>
+    <li><b>One app → multi-app platform</b> — YOKK / BOBO / NJOOBA / DAARA, and a potential sovereign-AI product.</li>
+    <li><b>"Build it all" → two clocks</b> — ship the platform now on cloud AI; let sovereign models graduate later.</li>
+  </ul>
+
+  <hr>
+  <h2><span class="e">🧠</span> Model choices — the AI stack &amp; the "why"</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Layer</th><th>Model</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Edge voice</td><td><b>LFM2.5-Audio</b></td><td>on-device audio → tool-call / JSON; small enough to fine-tune now</td></tr>
+      <tr><td>Streaming ASR</td><td><b>Nemotron 3.5 ASR</b></td><td>Wolof/French/code-mix, published recipe, latency controls</td></tr>
+      <tr><td>Duplex</td><td><b>NeMo SpeechLM2 / SALM</b></td><td>open recipe (encoder+LLM+codec) vs closed S2ST</td></tr>
+      <tr><td>Translation</td><td><b>Wolof-NMT / NLLB</b></td><td>fills the paired-data gap; the auditable text seam</td></tr>
+      <tr><td>TTS</td><td><b>xTTS-v2-wolof / FR</b></td><td>target speech, synthetic but review-gated</td></tr>
+      <tr><td>Retrieval</td><td><b>BGE-M3 Matryoshka</b></td><td>multilingual + edge dimension profiles for low memory</td></tr>
+      <tr><td>Cloud reasoning</td><td><b>Nemotron Nano / Omni</b></td><td>heavy multimodal above edge, evaluator/planner</td></tr>
+    </tbody>
+  </table></div>
+  <p style="font-size:12.8px;color:var(--soft);margin-top:12px"><b style="color:var(--ink)">Non-random design:</b> the <b style="color:var(--ink)">text seam</b> (STT→text→MT→text→TTS) over opaque S2ST for auditability; real anchors + synthetic bridges + human review for low-resource data; the compounding <b style="color:var(--ink)">Wolof commerce dataset</b> as the durable moat. <i>(All R&amp;D except retrieval, partially real.)</i></p>
+
+  <hr>
+  <h2><span class="e">🌍</span> Vision</h2>
+  <div class="breath" style="margin-bottom:14px">A <b>sovereign, edge-to-cloud AI platform for African (Wolof/French-first) commerce and assistance</b>, whose core primitive is <b>"models propose, the Engine disposes"</b> — a sovereign AI-action control plane where on-device intelligence can suggest, but only a sovereignty-typed backend turns intent into money/orders/PII, with data compiled to never leave Senegal.</div>
+  <div class="vis">
+    <div class="vc"><div class="t">The moat</div><p>Sovereignty by construction · African-first AI economics · edge-aware retrieval · regional rails · a compounding low-resource-language data advantage.</p></div>
+    <div class="vc"><div class="t">The ceiling</div><p>The default sovereign AI backend for African builders — full-duplex Wolof voice-commerce on a cheap phone, on a weak network, data staying home.</p></div>
+  </div>
+  <p style="font-size:13px;color:var(--soft);margin-top:16px;border-left:3px solid var(--w);padding-left:16px"><b style="color:var(--ink)">The through-line:</b> every pivot decouples the <i>bet</i> from the <i>breakthrough</i> — separating what can ship now from what research might unlock later. The vision is audacious <i>because</i> the architecture lets you pursue it without betting the company on the uncertain part.</p>
+
+  <div class="lang">🇫🇷 Français</div>
+
+  <h2><span class="e">🟢</span> Stade — où en est le projet</h2>
+  <p style="font-size:13.5px;color:var(--soft);margin-bottom:10px">Un <b>projet de R&amp;D doté d'une colonne vertébrale de qualité production</b> — deux horloges en parallèle :</p>
+  <ul>
+    <li><b>Plateforme (en ligne) :</b> Engine sur Railway (auth/commerce/produits vérifiés de bout en bout, DB privée, catalogue amorcé, bug uuid corrigé) ; BOBO web sur Cloudflare ; aller-retour frontend → engine → Postgres prouvé.</li>
+    <li><b>Structure (formalisée) :</b> deux dépôts — <b>Engine</b> (runtime/plan de contrôle) + <b>Harness</b> (capacités IA) ; alignement en cours.</li>
+    <li><b>Livré récemment :</b> manifestes bilingues (MD+HTML), plans inventaire + slice SDK/BOBO, onboarding bilingue, et le renommage <code>@njooba</code>→<code>@yaatal</code> (vérifié par le build web).</li>
+    <li><b>Recherche (R&amp;D) :</b> la pile de modèles wolof souverains — pas encore en production.</li>
+  </ul>
+
+  <hr>
+  <h2><span class="e">🔀</span> Pivots — les décisions directionnelles</h2>
+  <ul class="pivots">
+    <li><b>PowerSync → HTTP Engine</b> — le commerce BOBO quitte la synchro offline ; PowerSync = poids mort.</li>
+    <li><b>Backend d'app → plateforme agnostique</b> — l'Engine est un produit, pas le backend de BOBO.</li>
+    <li><b>Monolithe → en couches</b> — les capacités passent dans le Harness ; Engine = runtime/contrôle.</li>
+    <li><b>NJOOBA → Yaatal</b> — la graine n'est pas l'ombrelle ; scope partagé neutre.</li>
+    <li><b>IA cloud directe → cascade + souveraineté</b> — agnostique providers, edge-d'abord, résidence à la compilation.</li>
+    <li><b>Trois backends → consolider sur l'Engine</b> (en cours) — commerce sur l'Engine ; chat/livraison + paiements à traiter.</li>
+    <li><b>Une app → plateforme multi-apps</b> — YOKK / BOBO / NJOOBA / DAARA, et un produit IA souverain potentiel.</li>
+    <li><b>« Tout construire » → deux horloges</b> — livrer la plateforme maintenant avec l'IA cloud ; modèles souverains plus tard.</li>
+  </ul>
+
+  <hr>
+  <h2><span class="e">🧠</span> Choix de modèles — la pile IA &amp; le « pourquoi »</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Couche</th><th>Modèle</th><th>Pourquoi</th></tr></thead>
+    <tbody>
+      <tr><td>Voix edge</td><td><b>LFM2.5-Audio</b></td><td>audio on-device → tool-call / JSON ; assez petit pour fine-tuner maintenant</td></tr>
+      <tr><td>ASR streaming</td><td><b>Nemotron 3.5 ASR</b></td><td>wolof/français/code-mix, recette publiée, contrôle de latence</td></tr>
+      <tr><td>Duplex</td><td><b>NeMo SpeechLM2 / SALM</b></td><td>recette ouverte (encodeur+LLM+codec) vs S2ST fermé</td></tr>
+      <tr><td>Traduction</td><td><b>Wolof-NMT / NLLB</b></td><td>comble le manque de données appariées ; la couture texte auditable</td></tr>
+      <tr><td>TTS</td><td><b>xTTS-v2-wolof / FR</b></td><td>parole cible, synthétique mais sous revue</td></tr>
+      <tr><td>Recherche</td><td><b>BGE-M3 Matryoshka</b></td><td>multilingue + profils de dimension edge pour faible mémoire</td></tr>
+      <tr><td>Raisonnement cloud</td><td><b>Nemotron Nano / Omni</b></td><td>multimodal lourd au-dessus de l'edge, évaluateur/planificateur</td></tr>
+    </tbody>
+  </table></div>
+  <p style="font-size:12.8px;color:var(--soft);margin-top:12px"><b style="color:var(--ink)">Conception non aléatoire :</b> la <b style="color:var(--ink)">couture texte</b> (STT→texte→MT→texte→TTS) plutôt que du S2ST opaque pour l'auditabilité ; ancres réelles + ponts synthétiques + revue humaine pour les données peu dotées ; le <b style="color:var(--ink)">jeu de données wolof du commerce</b> comme fossé durable. <i>(Tout en R&amp;D sauf la recherche, partiellement réelle.)</i></p>
+
+  <hr>
+  <h2><span class="e">🌍</span> Vision</h2>
+  <div class="breath" style="margin-bottom:14px">Une <b>plateforme d'IA souveraine, edge-vers-cloud, pour le commerce et l'assistance africains (wolof/français d'abord)</b>, dont la primitive est <b>« les modèles proposent, l'Engine dispose »</b> — un plan de contrôle d'actions-IA souverain où l'intelligence on-device peut suggérer, mais seul un backend typé-souveraineté transforme l'intention en argent/commandes/données, avec des données compilées pour ne jamais quitter le Sénégal.</div>
+  <div class="vis">
+    <div class="vc"><div class="t">Le fossé</div><p>Souveraineté par construction · économie IA africaine-d'abord · recherche consciente de l'edge · rails régionaux · un avantage de données en langue peu dotée qui se compose.</p></div>
+    <div class="vc"><div class="t">Le plafond</div><p>Le backend IA souverain par défaut des bâtisseurs africains — commerce vocal wolof full-duplex sur un téléphone bon marché, réseau faible, données au pays.</p></div>
+  </div>
+  <p style="font-size:13px;color:var(--soft);margin-top:16px;border-left:3px solid var(--w);padding-left:16px"><b style="color:var(--ink)">Le fil conducteur :</b> chaque pivot découple le <i>pari</i> de la <i>percée</i> — séparant ce qui peut être livré maintenant de ce que la recherche pourrait débloquer plus tard. La vision est audacieuse <i>parce que</i> l'architecture permet de la poursuivre sans miser l'entreprise sur la partie incertaine.</p>
+
+  <footer>YAATAL · STATE OF THE PROJECT · 2026-06-07 · companion to STATE.md / ENGINE-MANIFEST · the code wins if anything here drifts.</footer>
+</div>
+</body>
+</html>
