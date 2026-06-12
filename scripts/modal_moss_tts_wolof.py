@@ -94,6 +94,10 @@ def run_cycle(recipe: dict, run_label: str, market_turns: list) -> dict:
                 txt = (ex[text_key] or "").strip()
                 if not txt:
                     continue
+                # codec attention is O(len^2): a multi-minute clip OOMs the A10G
+                dur = len(ex["audio"]["array"]) / ex["audio"]["sampling_rate"]
+                if not (0.5 <= dur <= 25.0):
+                    continue
                 if si == 0 and len(held_out) < 10:  # held-out only from primary
                     held_out.append(txt)
                     continue
