@@ -82,6 +82,18 @@ The LLM backbone is **swappable**. The paper uses a generic decoder; we use Gran
 
 **Wolof risk:** The codec was likely trained on English-centric data. Reconstruction quality for Wolof phonemes (implosives, vowel length) is unknown and needs subjective evaluation.
 
+**Apache fallback (added 2026-06-12):** [`OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano`](https://hf.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano)
+— 22M-param neural codec, **license: Apache-2.0 (verified on the model card)**, 100K+ downloads,
+official ONNX build. If the NeMo codec license check fails or its Wolof reconstruction is poor,
+this is the drop-in candidate for the codec slot. Compatibility with the SALM parallel-codebook
+interface needs a spike (different token layout is the main risk). Sibling model
+[`MOSS-TTS-Nano-100M`](https://hf.co/OpenMOSS-Team/MOSS-TTS-Nano-100M) (100M-param CPU-capable TTS,
+Apache-2.0, fr/ar among 20 langs) is the new lead candidate for the **Boplex TTS mouth lane**:
+official SFT recipe at [OpenMOSS/MOSS-TTS-Nano `finetuning/`](https://github.com/OpenMOSS/MOSS-TTS-Nano)
+(plain `audio`+`text` JSONL, ~3.2 GiB VRAM, full SFT), with a **West African precedent** —
+`ghananlpcommunity/moss-tts-nano-twi-sft` (Twi, 2026-06-04) — and a Norwegian new-language LoRA in
+`community/`. Rust inference exists (`ramishi/moss-tts-nano-candle`), relevant for Engine integration.
+
 ### Component D — Turn-Taking Controller
 
 From NeMo `DuplexS2SModel` and the SALM paper:
@@ -188,6 +200,23 @@ The Nemotron 600M base has no Wolof. The NeMo manifest pipeline is complete:
 
 **Dataset:** `galsenai/wolof-audio-data` — 35,075 samples, ~68 hours, Apache-2.0.
 
+**Dataset upgrade (2026-06-12):** [`soynade-research/Wolof-ASR-Data`](https://hf.co/datasets/soynade-research/Wolof-ASR-Data)
+— the Oolel team's curated **116 h** (97.9 train / 17.8 test: FLEURS + ALFFA + CommonVoice + Kallama
++ UB), CC-BY-SA-4.0. Supersedes the single-source manifest as the encoder fine-tune base; extend
+`nemo_asr_00_create_manifest.py` to ingest it. Companion asset:
+[`soynade-research/Wolof-Non-Standard-Orthography`](https://hf.co/datasets/soynade-research/Wolof-Non-Standard-Orthography)
+(informal→standard text pairs) — use it (a) as the transcript normalizer when pseudo-labeling
+in-the-wild audio, (b) to harden router training data against real-world spelling, and (c) to
+normalize ref/hyp in CER-based evals so orthography drift doesn't read as model error.
+
+**Planned in-domain lane:** YouTube micro-trottoir / code-switched public events (pipeline seed:
+`scripts/yaatal_df_08_extract_youtube_mapping.py`): yt-dlp → VAD segment → pseudo-label with best
+Wolof ASR → orthography-normalize → confidence filter → human spot-review (Supabase→Sheets→n8n) →
+fine-tune mix. **Ears only** — spontaneous/noisy audio degrades TTS voices; the transcripts (not the
+audio) feed the mouth lane's text normalizer. Research-use posture: keep provenance, never
+redistribute audio. Also on HF already: [`serge-wilson/wolof-french-asr`](https://hf.co/datasets/serge-wilson/wolof-french-asr)
+(unified wo-fr, tagged code-switching, CC-BY-4.0).
+
 **Cost:** ~$3–4 for a 10-epoch fine-tune on Modal A10G (fits inside $30 starter credit).
 
 **Remaining:** GPU execution only. Requires Modal token + HF token in environment.
@@ -210,6 +239,7 @@ The NeMo codec's reconstruction quality for Wolof phonemes is unknown. Requires:
 - Subjective listening tests with native speakers
 - Objective metrics (MOS, similarity to reference)
 - Possibly codec fine-tuning on Wolof TTS output from `galsenai/xTTS-v2-wolof`
+- Fallback if NeMo codec fails on license or Wolof quality: MOSS-Audio-Tokenizer-Nano (Apache-2.0, §2.C)
 
 ### D. Granite 350M LoRA for intent
 A short LoRA smoke (60–500 steps) run on the **same Modal harness as the 1B qualification**

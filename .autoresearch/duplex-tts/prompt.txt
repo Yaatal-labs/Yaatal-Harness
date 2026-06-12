@@ -1,0 +1,24 @@
+{
+  "run_label": "run2",
+  "base_model": "OpenMOSS-Team/MOSS-TTS-Nano-100M",
+  "codec_model": "OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano",
+  "dataset": "galsenai/wolof_tts",
+  "extra_datasets": [],
+  "max_train_clips": 6000,
+  "language_tag": "wo",
+  "text_normalize": "none",
+  "learning_rate": 1e-05,
+  "num_epochs": 4,
+  "per_device_batch_size": 1,
+  "grad_accum": 8,
+  "max_length": 1024,
+  "channelwise_loss_weight": "1,32",
+  "asr_model": "asr-africa/w2v2-bert-wolof-mixed-75-hours",
+  "thresholds": {
+    "cer_median": 0.35,
+    "stoi_mean": 0.75,
+    "sanity_min_of_20": 18,
+    "duplex_min_of_5": 5,
+    "entity_min_of_10": 7
+  }
+}

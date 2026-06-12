@@ -1,0 +1,49 @@
+{
+ "best_score": 3,
+ "best_validation_score": 1,
+ "run_number": 1,
+ "target": "Full-duplex Wolof edge voice: MOSS-TTS-Nano Wolof SFT (mouth) + Granite 350M router (brain), trained+evaled on Modal; demo page on Yaatal-Registry",
+ "scope": "Training recipe JSON (data mix, normalization, SFT hyperparams) mutated per cycle; harness scripts/modal_moss_tts_wolof.py",
+ "context": "Vision: mother-tongue-first, non-literate-first. Brain already qualified (350M, slot_f1 0.846). Twi precedent proves MOSS new-language SFT. CC-BY-4.0 data (galsenai/wolof_tts). Fallback goal: finished training loaded in Modal.",
+ "max_score": 6,
+ "criteria_count": 6,
+ "batch_size": 20,
+ "criteria": [
+  {
+   "name": "gen_success",
+   "desc": "checkpoint synthesizes all 20 eval sentences without error",
+   "type": "command"
+  },
+  {
+   "name": "asr_roundtrip",
+   "desc": "median CER of Wolof ASR transcripts vs input text <= 0.35",
+   "type": "command"
+  },
+  {
+   "name": "audio_sanity",
+   "desc": ">=18/20 outputs within duration bounds and above silence-floor RMS",
+   "type": "command"
+  },
+  {
+   "name": "stoi_quality",
+   "desc": "SQUIM-objective STOI mean >= 0.75",
+   "type": "command"
+  },
+  {
+   "name": "duplex_e2e",
+   "desc": "5/5 market turns: router intent JSON valid -> Wolof reply -> audible TTS",
+   "type": "command"
+  },
+  {
+   "name": "entity_fidelity",
+   "desc": ">=7/10 market transcripts preserve key entities (numbers, products)",
+   "type": "llm-judge"
+  }
+ ],
+ "validation_items": [
+  "10 fixed sentences: 5 galsenai held-out (seed 42) + 5 Boplex market turns (ids _001.._005)"
+ ],
+ "sampled_items": [],
+ "item_failures": {},
+ "plateau_counter": 0
+}
