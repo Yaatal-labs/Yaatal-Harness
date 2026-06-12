@@ -1,5 +1,5 @@
 {
-  "run_label": "run2",
+  "run_label": "run4",
   "base_model": "OpenMOSS-Team/MOSS-TTS-Nano-100M",
   "codec_model": "OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano",
   "dataset": "galsenai/wolof_tts",
@@ -7,8 +7,8 @@
   "max_train_clips": 6000,
   "language_tag": "wo",
   "text_normalize": "none",
-  "learning_rate": 1e-05,
-  "num_epochs": 4,
+  "learning_rate": 3e-05,
+  "num_epochs": 6,
   "per_device_batch_size": 1,
   "grad_accum": 8,
   "max_length": 1024,
@@ -20,5 +20,6 @@
     "sanity_min_of_20": 18,
     "duplex_min_of_5": 5,
     "entity_min_of_10": 7
-  }
+  },
+  "eval_mode": "voice_clone"
 }

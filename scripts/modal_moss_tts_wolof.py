@@ -72,25 +72,37 @@ def run_cycle(recipe: dict, run_label: str, market_turns: list) -> dict:
         from datasets import load_dataset, Audio
         import soundfile as sf
 
-        ds = load_dataset(recipe["dataset"], split="train")
-        ds = ds.cast_column("audio", Audio(sampling_rate=24000))
-        ds = ds.shuffle(seed=42)
-        n = min(recipe["max_train_clips"] + 20, len(ds))
-        wav_dir = data_dir / "wav"
-        wav_dir.mkdir(parents=True, exist_ok=True)
-        text_key = next(k for k in ("text", "transcription", "sentence") if k in ds.column_names)
+        # dataset mix: primary + extra_datasets, budget split evenly across sources.
+        # extras may carry a quality tag ("name:quality") passed into the MOSS JSONL.
+        sources = [(recipe["dataset"], None)]
+        for spec in recipe.get("extra_datasets", []):
+            name, _, q = spec.partition(":")
+            sources.append((name, q or None))
+        budget = recipe["max_train_clips"] // len(sources)
         rows, held_out = [], []
-        for i, ex in enumerate(ds.select(range(n))):
-            txt = (ex[text_key] or "").strip()
-            if not txt:
-                continue
-            if len(held_out) < 10:  # first 10 non-empty = held-out (never trained)
-                held_out.append(txt)
-                continue
-            wav = wav_dir / f"clip_{i:06d}.wav"
-            if not wav.exists():
-                sf.write(str(wav), ex["audio"]["array"], ex["audio"]["sampling_rate"])
-            rows.append({"audio": str(wav), "text": txt, "language": recipe["language_tag"]})
+        for si, (ds_name, quality) in enumerate(sources):
+            ds = load_dataset(ds_name, split="train")
+            ds = ds.cast_column("audio", Audio(sampling_rate=24000))
+            ds = ds.shuffle(seed=42)
+            n = min(budget + (20 if si == 0 else 0), len(ds))
+            wav_dir = Path(V) / "data" / ds_name.replace("/", "__") / "wav"
+            wav_dir.mkdir(parents=True, exist_ok=True)
+            text_key = next(k for k in ("text", "transcription", "sentence", "transcript")
+                            if k in ds.column_names)
+            for i, ex in enumerate(ds.select(range(n))):
+                txt = (ex[text_key] or "").strip()
+                if not txt:
+                    continue
+                if si == 0 and len(held_out) < 10:  # held-out only from primary
+                    held_out.append(txt)
+                    continue
+                wav = wav_dir / f"clip_{i:06d}.wav"
+                if not wav.exists():
+                    sf.write(str(wav), ex["audio"]["array"], ex["audio"]["sampling_rate"])
+                row = {"audio": str(wav), "text": txt, "language": recipe["language_tag"]}
+                if quality:
+                    row["quality"] = quality
+                rows.append(row)
         raw_jsonl.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows),
                              encoding="utf-8")
         # eval set: 10 fixed validation (5 held-out + 5 market) + 10 rotating
@@ -167,12 +179,21 @@ def run_cycle(recipe: dict, run_label: str, market_turns: list) -> dict:
     audio_dir = out / "eval_audio"
     audio_dir.mkdir(exist_ok=True)
 
+    # voice_clone mode anchors generation to a native reference clip (recipe
+    # "eval_mode": "voice_clone"); bare continuation invents a voice from nothing
+    eval_mode = recipe.get("eval_mode", "continuation")
+    prompt_args = []
+    if eval_mode == "voice_clone":
+        first_row = json.loads(raw_jsonl.read_text(encoding="utf-8").splitlines()[0])
+        prompt_args = ["--prompt-audio-path", first_row["audio"]]
+
     gen_ok, durs, rms_vals, paths = 0, [], [], []
     for i, txt in enumerate(all_sents):
         wav_path = audio_dir / f"eval_{i:02d}.wav"
         rc = _run(f"gen{i}", [sys.executable, "finetuning/verify.py",
-                              "--checkpoint", ckpt, "--mode", "continuation",
-                              "--text", txt, "--output-audio-path", str(wav_path)])
+                              "--checkpoint", ckpt, "--mode", eval_mode,
+                              "--text", txt, *prompt_args,
+                              "--output-audio-path", str(wav_path)])
         if rc == 0 and wav_path.exists():
             gen_ok += 1
             paths.append((i, txt, wav_path))
@@ -250,8 +271,8 @@ def run_cycle(recipe: dict, run_label: str, market_turns: list) -> dict:
                 pass
             wav_path = audio_dir / f"duplex_{j}.wav"
             rc = _run(f"duplex{j}", [sys.executable, "finetuning/verify.py",
-                                     "--checkpoint", ckpt, "--mode", "continuation",
-                                     "--text", acks[None],
+                                     "--checkpoint", ckpt, "--mode", eval_mode,
+                                     "--text", acks[None], *prompt_args,
                                      "--output-audio-path", str(wav_path)])
             spoke = rc == 0 and wav_path.exists()
             duplex_pass += int(ok_json and spoke)

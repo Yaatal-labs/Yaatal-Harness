@@ -1,10 +1,10 @@
 {
  "best_score": 3,
  "best_validation_score": 1,
- "run_number": 1,
+ "run_number": 3,
  "target": "Full-duplex Wolof edge voice: MOSS-TTS-Nano Wolof SFT (mouth) + Granite 350M router (brain), trained+evaled on Modal; demo page on Yaatal-Registry",
  "scope": "Training recipe JSON (data mix, normalization, SFT hyperparams) mutated per cycle; harness scripts/modal_moss_tts_wolof.py",
- "context": "Vision: mother-tongue-first, non-literate-first. Brain already qualified (350M, slot_f1 0.846). Twi precedent proves MOSS new-language SFT. CC-BY-4.0 data (galsenai/wolof_tts). Fallback goal: finished training loaded in Modal.",
+ "context": "Vision: mother-tongue-first, non-literate-first. Brain already qualified (350M, slot_f1 0.846). Twi precedent proves MOSS new-language SFT. CC-BY-4.0 data (galsenai/wolof_tts). Fallback goal: finished training loaded in Modal. HUMAN EVAL (run3): phonology yes, lexicon no -> data breadth is the constraint.",
  "max_score": 6,
  "criteria_count": 6,
  "batch_size": 20,
@@ -45,5 +45,5 @@
  ],
  "sampled_items": [],
  "item_failures": {},
- "plateau_counter": 0
+ "plateau_counter": 2
 }
