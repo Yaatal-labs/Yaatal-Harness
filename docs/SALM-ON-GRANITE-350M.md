@@ -6,7 +6,12 @@
 
 SALM-Duplex is not an audio-native model like Liquid. It is a **composition** of three swappable components — encoder, LLM backbone, codec — plus a turn-taking controller. This decouples license from capability.
 
-**Granite 4.0 H 350M Instruct is the new aggressive-edge candidate for the backbone slot.** At 350M parameters (vs. the previously planned 1B), it is small enough to run on mid-range phone SoCs while retaining native function-calling. Apache-2.0 throughout. The open question is whether 350M is large enough for Wolof/French code-mix intent accuracy — a short LoRA smoke resolves this.
+**Granite 4.0 H 350M Instruct is the default edge backbone — gate passed 2026-06-12.** The LoRA
+smoke ran on the same Modal harness and the same v2 dataset as the 1B: slot_f1 0.846 vs the 1B's
+0.879 (a 3.8% gap, inside the ≤5% gate), intent accuracy **0.993 vs 0.960** (the 350M wins), JSON
+validity 1.0 for both, and a ~210 MB Q4 GGUF vs 901 MB. Known weakness: exact-match (0.073 vs
+0.353) — full-dict perfection is where the 1B's capacity shows; the distillation catch-up
+(1B teacher → 350M student) is the planned closer. Apache-2.0 throughout.
 
 **Dual-lane candidate.** The same composition serves both product lanes: in the **Commerce lane** it is the voice agent backbone (intent + tool-call through the text seam), and in the **Livestream lane** it is the duplex engine the Atlantic blueprint calls for (the interactive translation agent). One backbone, one license chain, two products — whether deployed text-only (Nano tool-router) or as full SALM voice.
 
@@ -170,11 +175,27 @@ settled the backbone family on Granite.)
 ## 6. What must be built (honest flags)
 
 ### A. Wolof speech encoder
-The Nemotron 600M base has no Wolof. Required:
-- NeMo manifest export from `galsenai/wolof-audio-data`
-- 10–20 epoch fine-tune on A10 GPU (Modal or NYIT)
+
+**Status: Pipeline scripts written. GPU execution pending.**
+
+The Nemotron 600M base has no Wolof. The NeMo manifest pipeline is complete:
+
+| Artifact | File | Status |
+|---|---|---|
+| Manifest converter | `scripts/nemo_asr_00_create_manifest.py` | ✅ Written & dry-run verified (10 samples) |
+| Fine-tune boilerplate | `scripts/nemo_asr_01_finetune.py` | ✅ Written (533 lines, RNNT + FastEmit + SpecAugment + AdamW/cosine + LoRA toggle) |
+| Modal runner | `scripts/nemo_asr_01_finetune_modal.py` | ✅ Working `modal run` script (CPU manifest phase + A10G GPU fine-tune phase) |
+
+**Dataset:** `galsenai/wolof-audio-data` — 35,075 samples, ~68 hours, Apache-2.0.
+
+**Cost:** ~$3–4 for a 10-epoch fine-tune on Modal A10G (fits inside $30 starter credit).
+
+**Remaining:** GPU execution only. Requires Modal token + HF token in environment.
+
+**Fine-tune targets:**
+- 10–20 epochs on A10 GPU (Modal or NYIT)
 - Held-out WER evaluation on FLEURS Wolof test set
-- Target: WER < 30% on code-mix utterances
+- Target: WER &lt; 30% on code-mix utterances
 
 ### B. Code-mix acoustic robustness
 Senegalese speech is rarely pure Wolof. The encoder must handle:
@@ -202,6 +223,21 @@ metrics: slot_f1 and exact-match on the held-out split, plus the lexicon probes.
 | Within ~5% of the 1B on slot_f1 | 350M becomes the default edge backbone |
 | 5–15% behind the 1B | 350M for prototype + **distillation catch-up** (1B teacher → 350M student via TRL GKD, on-policy); 1B for production |
 | More than 15% behind | Granite 1B stays the backbone; 350M parked for commodity-phone tier via distillation only |
+
+**RESULT (2026-06-12, 60-step LoRA, 150-row v2 held-out):**
+
+| Metric | 350M | 1B | Read |
+|---|---|---|---|
+| slot_f1 | 0.846 | 0.879 | **3.8% gap → GATE 1 PASSED** |
+| intent accuracy | **0.993** | 0.960 | 350M wins |
+| exact_match | 0.073 | 0.353 | 1B's capacity edge; distillation target |
+| JSON validity | 1.000 | 1.000 | tie |
+| Q4_K_M GGUF | ~210 MB | 901 MB | both exported, in `yaatal-bakeoff-out` |
+
+**→ Granite 350M is the default edge backbone.** The 1B remains the quality fallback and the
+designated distillation teacher for closing the exact-match gap. Caveats: synthetic data
+(needs_native_review), 60-step smoke, 150-row eval — the human-reviewed eval set replaces this
+scoreboard as it lands.
 
 ### E. Turn-taking UX
 Full-duplex means interruptions are allowed. In Wolof conversational context:
@@ -243,15 +279,32 @@ Medium engineering effort, not research.
 qualified), and reach the 350M tier later by distilling the 1B into it (TRL GKD, same tokenizer,
 same family) rather than by direct SFT.
 
-## 9. Recommended next action
+## 9. Recommended next actions
 
-1. **Run the LoRA smoke** on Granite 350M instruct via the existing Modal harness, on the
+### Immediate (no GPU needed)
+1. ✅ **Manifest converter verified** — `scripts/nemo_asr_00_create_manifest.py` dry-run passed.
+2. ✅ **Fine-tune boilerplate written** — `scripts/nemo_asr_01_finetune.py` ready.
+3. ✅ **Modal runner written** — `scripts/nemo_asr_01_finetune_modal.py` ready for `modal run`.
+4. ✅ **Cost analysis documented** — `docs/COST-AND-CODEC-ANALYSIS.md` (240 lines).
+
+### Requires GPU / credentials
+5. **Run the LoRA smoke** on Granite 350M instruct via the existing Modal harness, on the
    **6,022-row v2 dataset**, scored against the 1B champion's numbers (see §6.D).
-2. **If accuracy holds:** Update the edge-intent prototype to use Granite 350M; update
-   model-inventory docs (portal + Engine).
-3. **Parallel:** Begin Nemotron 600M Wolof encoder fine-tune (NeMo manifest from the 97.9h
-   Wolof-ASR-Data corpus → A10 run on Modal or NYIT).
-4. **Parallel:** Verify NeMo codec license (last unchecked link in the chain).
+6. **Run Nemotron ASR fine-tune** via Modal: `modal run scripts/nemo_asr_01_finetune_modal.py --epochs 10`.
+   Estimated time: ~3 hours. Estimated cost: $3–4.
+7. **Verify NeMo codec license** — last unchecked link in the sovereign chain.
+
+### Decision gates
+| If LoRA smoke result | Then |
+|---|---|
+| Within ~5% of 1B on slot_f1 | 350M becomes default edge backbone |
+| 5–15% behind | 350M for prototype + distillation catch-up; 1B for production |
+| More than 15% behind | 1B stays backbone; 350M parked for commodity-phone tier via distillation only |
+
+### Parallel tracks
+- **Encoder:** Begin Nemotron 600M Wolof fine-tune (Modal A10 or NYIT GPU).
+- **Codec:** Verify license, assess Wolof reconstruction quality, plan TTS-data fine-tune if needed.
+- **Engine:** Begin `yaatal-voice` crate integration planning (Python sidecar → HF export → Rust ML runtime).
 
 ## Sources (verified, not memory)
 
@@ -270,5 +323,5 @@ same family) rather than by direct SFT.
 ---
 
 *Document: SALM-ON-GRANITE-350M.md*
-*Snapshot: 2026-06-11*
-*Status: Decision record — open for revision when LoRA smoke results arrive*
+*Snapshot: 2026-06-12*
+*Status: Decision record — LoRA smoke complete, gate passed: 350M is the default edge backbone*

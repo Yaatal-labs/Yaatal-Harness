@@ -52,8 +52,9 @@ LOCAL_DATA = "output/yaatal-data-factory/bobo-tool"
 # 350M hold slot fidelity vs the qualified 1B, BOTH trained on the v2 dataset (6,022 rows) so the
 # comparison is same-data. data="v2" routes to the converted market_intent files.
 SPECS = [
-    {"label": "granite-4.0-h-350m-v2", "base": "ibm-granite/granite-4.0-h-350m", "kind": "hyb·350m", "trc": False, "data": "v2"},
-    {"label": "granite-4.0-h-1b-v2", "base": "ibm-granite/granite-4.0-h-1b", "kind": "hyb·1b", "trc": False, "data": "v2"},
+    # 350m-v2 completed (scoreboard+gguf in volume); finishing the 1b from its saved LoRA.
+    {"label": "granite-4.0-h-1b-v2", "base": "ibm-granite/granite-4.0-h-1b", "kind": "hyb·1b",
+     "trc": False, "data": "v2", "skip_train": True},
 ]
 
 app = modal.App("yaatal-bakeoff")
@@ -136,13 +137,20 @@ def run_one(spec: dict) -> dict:
     trc_flag = ["--trust-remote-code"] if trc else []
     r: dict = {"label": label, "base": base, "kind": spec.get("kind")}
 
-    r["train_rc"] = _run(f"{label}:train", [sys.executable, f"/work/scripts/{SCRIPTS[0]}",
-        "--base", base, "--train", ds["train"],
-        "--output-dir", adapter, "--max-steps", str(max_steps)] + trc_flag + sys_flag + mem_flags)
-    vol.commit()
-    if r["train_rc"] != 0:
-        r["error"] = "train failed"
-        return r
+    if spec.get("skip_train"):
+        vol.reload()
+        r["train_rc"] = "skipped"
+        if not Path(adapter).exists():
+            r["error"] = f"skip_train set but no adapter at {adapter}"
+            return r
+    else:
+        r["train_rc"] = _run(f"{label}:train", [sys.executable, f"/work/scripts/{SCRIPTS[0]}",
+            "--base", base, "--train", ds["train"],
+            "--output-dir", adapter, "--max-steps", str(max_steps)] + trc_flag + sys_flag + mem_flags)
+        vol.commit()
+        if r["train_rc"] != 0:
+            r["error"] = "train failed"
+            return r
 
     r["eval_rc"] = _run(f"{label}:eval", [sys.executable, f"/work/scripts/{SCRIPTS[1]}",
         "--base", base, "--adapter", adapter,
