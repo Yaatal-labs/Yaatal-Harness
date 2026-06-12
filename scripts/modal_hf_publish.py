@@ -355,8 +355,51 @@ def publish(run_label: str, include_router: bool = False,
     return out
 
 
+@app.function(image=image,
+              secrets=[modal.Secret.from_name("huggingface-secret")],
+              timeout=1200)
+def publish_factory(files: dict) -> dict:
+    """Upload data-factory JSONL files (passed as {repo_path: text}) to the warehouse."""
+    from huggingface_hub import HfApi
+
+    token = (os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN")
+             or os.environ.get("HUGGING_FACE_HUB_TOKEN"))
+    api = HfApi(token=token)
+    user = api.whoami()["name"]
+    d_repo = f"{user}/yaatal-voice-warehouse"
+    api.create_repo(d_repo, private=True, exist_ok=True, repo_type="dataset")
+    for path, content in files.items():
+        api.upload_file(path_or_fileobj=content.encode("utf-8"),
+                        path_in_repo=path, repo_id=d_repo, repo_type="dataset")
+    return {"repo": d_repo, "uploaded": sorted(files)}
+
+
+FACTORY_FILES = {  # local data-factory outputs worth archiving (all small JSONL)
+    "factory/bobo-tool": ["scenario_seed.jsonl", "synthetic_bootstrap_train.jsonl",
+                          "synthetic_bootstrap_val.jsonl", "slot_lexicon.json",
+                          "search_products.schema.json"],
+    "factory/translation": ["train_pairs.jsonl", "validation_pairs.jsonl",
+                            "test_pairs.jsonl"],
+    "factory/boplex-tts": ["scenario_turns.jsonl", "tts_input_manifest.jsonl",
+                           "tts_generation_plan.jsonl", "tts_output_manifest.jsonl"],
+}
+FACTORY_LOCAL = {"factory/bobo-tool": "output/yaatal-data-factory/bobo-tool",
+                 "factory/translation": "output/yaatal-data-factory/translation",
+                 "factory/boplex-tts": "output/yaatal-data-factory/tts"}
+
+
 @app.local_entrypoint()
 def main(run_label: str = "run1-baseline", include_router: bool = False,
-         cards_only: bool = False):
+         cards_only: bool = False, factory: bool = False):
+    if factory:
+        files = {}
+        for repo_dir, names in FACTORY_FILES.items():
+            local = Path(FACTORY_LOCAL[repo_dir])
+            for n in names:
+                p = local / n
+                if p.exists() and p.stat().st_size > 0:
+                    files[f"{repo_dir}/{n}"] = p.read_text(encoding="utf-8")
+        print(json.dumps(publish_factory.remote(files), indent=1))
+        return
     print(json.dumps(publish.remote(run_label, include_router, cards_only),
                      indent=1))
