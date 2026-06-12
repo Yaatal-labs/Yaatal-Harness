@@ -76,11 +76,16 @@ The LLM backbone is **swappable**. The paper uses a generic decoder; we use Gran
 | **Source** | NVIDIA NeMo `speechlm2` |
 | **Bitrate** | ~0.6 kbps (from SALM paper) |
 | **Type** | Parallel RVQ / FSQ codebook |
-| **License** | Apache-2.0 (assumed; last unverified link in chain) |
+| **License** | **VERIFIED 2026-06-12: NOT Apache.** All NVIDIA codec checkpoints (incl. `nvidia/nemo-nano-codec-22khz-1.78kbps-12.5fps`, 62M, FSQ 13×2016, 12.5 fps) ship under the **NVIDIA Open Model License** — commercial use allowed, but conditional (attribution, guardrail clauses, NVIDIA termination rights). Usable, not sovereign-clean. |
 
 **What it does:** Converts the LLM's discrete speech-token predictions back into audible waveform. This is a neural vocoder, not TTS. It reconstructs speech from a compact latent representation.
 
 **Wolof risk:** The codec was likely trained on English-centric data. Reconstruction quality for Wolof phonemes (implosives, vowel length) is unknown and needs subjective evaluation.
+
+**License verdict (2026-06-12):** with the NeMo codec confirmed NVIDIA-OML (conditional) and the
+MOSS codec confirmed Apache-2.0 (unconditional), the MOSS tokenizer is **promoted from fallback to
+preferred codec candidate**, pending the SALM-interface technical spike. The NeMo codec remains the
+working option where NeMo tooling requires it.
 
 **Apache fallback (added 2026-06-12):** [`OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano`](https://hf.co/OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano)
 — 22M-param neural codec, **license: Apache-2.0 (verified on the model card)**, 100K+ downloads,
