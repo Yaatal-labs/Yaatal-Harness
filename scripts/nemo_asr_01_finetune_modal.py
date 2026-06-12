@@ -45,14 +45,14 @@ image = (
     modal.Image.debian_slim(python_version="3.10")
     .apt_install("git", "ffmpeg", "libsndfile1")
     .pip_install(
-        "nemo-toolkit[asr]>=2.0",
+        "nemo-toolkit[asr]==2.3.1",
         "huggingface-hub>=0.22",
-        "datasets>=4.4",
+        "datasets==2.21.0",
         "soundfile>=0.12",
         "librosa>=0.10",
-        "torch>=2.1",
-        "torchaudio>=2.1",
-        "pytorch-lightning>=2.0",
+        "torch==2.6.0",
+        "torchaudio==2.6.0",
+        "pytorch-lightning==2.4.0",
         "omegaconf>=2.3",
         "wandb>=0.16",
         "numpy>=1.26",
