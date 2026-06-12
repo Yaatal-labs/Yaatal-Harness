@@ -46,8 +46,8 @@ image = (
     .apt_install("git", "ffmpeg", "libsndfile1")
     .pip_install(
         "nemo-toolkit[asr]==2.3.1",
-        "huggingface-hub>=0.22",
-        "datasets==2.21.0",
+        "huggingface-hub>=0.22", "hf_transfer",
+        "datasets>=4.4",
         "soundfile>=0.12",
         "librosa>=0.10",
         "torch==2.6.0",
