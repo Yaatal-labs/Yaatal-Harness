@@ -30,7 +30,7 @@ image = (
         "torch==2.7.0", "torchaudio==2.7.0",
         "transformers==4.57.1", "accelerate>=1.0.0", "datasets==2.21.0",
         "soundfile", "librosa", "jiwer", "peft", "tqdm", "safetensors",
-        "huggingface_hub", "sentencepiece", "protobuf", "WeTextProcessing>=1.0.4.1",
+        "huggingface_hub", "sentencepiece", "protobuf", "wandb", "WeTextProcessing>=1.0.4.1",
     )
     .run_commands("git clone --depth 1 https://github.com/OpenMOSS/MOSS-TTS-Nano /opt/moss")
 )
@@ -46,6 +46,7 @@ def _run(tag: str, cmd: list, cwd: str = "/opt/moss") -> int:
 
 
 @app.function(image=image, gpu="A10G", volumes={V: vol, "/bakeoff": bakeoff_vol},
+              secrets=[modal.Secret.from_name("wandb-secret")],
               timeout=4 * 3600)
 def run_cycle(recipe: dict, run_label: str, market_turns: list) -> dict:
     import torch
@@ -311,15 +312,55 @@ def run_cycle(recipe: dict, run_label: str, market_turns: list) -> dict:
     (out / "scoreboard.json").write_text(json.dumps(sb, ensure_ascii=False, indent=1),
                                          encoding="utf-8")
     vol.commit()
+    try:  # experiment tracking; never let it fail the cycle
+        import wandb
+        w = wandb.init(project="yaatal-duplex-tts", name=run_label, config=recipe)
+        w.log({**{f"criteria/{k}": int(v) for k, v in crit.items()},
+               "cer_median": sb["metrics"]["cer_median"],
+               "cer_validation_median": sb["metrics"]["cer_validation_median"],
+               "stoi_mean": sb["metrics"]["stoi_mean"] or 0.0,
+               "sanity": sanity, "gen_ok": gen_ok, "duplex_pass": duplex_pass})
+        w.finish()
+    except Exception as e:
+        print(f"[wandb] skipped: {e}")
     print("SCOREBOARD:", json.dumps({k: v for k, v in sb.items()
                                      if k in ("criteria", "metrics")}, indent=1))
     return sb
 
 
+@app.function(image=image, volumes={V: vol},
+              secrets=[modal.Secret.from_name("wandb-secret")], timeout=600)
+def backfill_wandb() -> list:
+    """One wandb run per existing scoreboard in the volume (runs that predate tracking)."""
+    import wandb
+
+    logged = []
+    for sb_path in sorted(Path(V).glob("runs/*/scoreboard.json")):
+        sb = json.loads(sb_path.read_text(encoding="utf-8"))
+        if "metrics" not in sb:
+            continue
+        m = sb["metrics"]
+        w = wandb.init(project="yaatal-duplex-tts",
+                       name=f"backfill-{sb['run_label']}", config=sb.get("recipe", {}))
+        w.log({**{f"criteria/{k}": int(v) for k, v in sb.get("criteria", {}).items()},
+               "cer_median": m["cer_median"],
+               "cer_validation_median": m.get("cer_validation_median", 1.0),
+               "stoi_mean": m.get("stoi_mean") or 0.0,
+               "sanity": m["sanity"], "gen_ok": m["gen_ok"],
+               "duplex_pass": m["duplex_pass"]})
+        w.finish()
+        logged.append(sb["run_label"])
+    return logged
+
+
 @app.local_entrypoint()
 def main(recipe: str = ".autoresearch/duplex-tts/prompt.txt",
          run_label: str = "run1",
-         market_manifest: str = "output/yaatal-data-factory/tts/tts_input_manifest.jsonl"):
+         market_manifest: str = "output/yaatal-data-factory/tts/tts_input_manifest.jsonl",
+         backfill: bool = False):
+    if backfill:
+        print(json.dumps(backfill_wandb.remote(), indent=1))
+        return
     rec = json.loads(Path(recipe).read_text(encoding="utf-8"))
     turns = [json.loads(l) for l in
              Path(market_manifest).read_text(encoding="utf-8").splitlines() if l.strip()]
