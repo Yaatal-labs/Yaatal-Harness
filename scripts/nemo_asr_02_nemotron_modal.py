@@ -33,6 +33,9 @@ image = (
     .pip_install("Cython", "packaging", "huggingface-hub>=0.22", "hf_transfer",
                  "soundfile", "wandb")
     .pip_install("nemo_toolkit[asr] @ git+https://github.com/NVIDIA-NeMo/NeMo.git@main")
+    # examples/ + prompt YAMLs are not in the pip package; the official recipe
+    # drives NeMo's own fine-tune script with the streaming-prompt config
+    .run_commands("git clone --depth 1 https://github.com/NVIDIA-NeMo/NeMo /opt/NeMo")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
 )
 
@@ -62,6 +65,7 @@ def tag_manifests() -> dict:
                 if not line.strip():
                     continue
                 row = json.loads(line)
+                row["lang"] = TARGET_LANG          # notebook manifests carry both
                 row["target_lang"] = TARGET_LANG
                 g.write(json.dumps(row, ensure_ascii=False) + "\n")
                 n += 1
@@ -74,11 +78,12 @@ def tag_manifests() -> dict:
 @app.function(gpu="A10G", volumes={MOUNT: volume},
               secrets=[modal.Secret.from_name("wandb-secret")], timeout=5 * 3600)
 def finetune(epochs: int = 10, lr: float = 1e-4, batch_size: int = 8) -> dict:
-    import torch
-    import lightning.pytorch as pl  # single import style, NeMo's base
-    from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
-    from omegaconf import OmegaConf, open_dict
-    from nemo.collections.asr.models import ASRModel
+    """Official recipe path: NeMo's own fine-tune script + the streaming-prompt
+    YAML (which wires the prompted dataset that yields prompt_indices), seeded
+    with +init_from_nemo_model per the NVIDIA notebook."""
+    import subprocess
+    import sys
+    from huggingface_hub import snapshot_download
 
     manifests = {s: f"{NEMOTRON_DIR}/wolof_nemotron_manifest_{s}.jsonl"
                  for s in ("train", "validation", "test")}
@@ -86,79 +91,56 @@ def finetune(epochs: int = 10, lr: float = 1e-4, batch_size: int = 8) -> dict:
         if not Path(p).exists():
             return {"status": "error", "stage": "manifests", "error": f"missing {p}"}
 
-    print(f"[1/5] Loading {BASE_MODEL} (NeMo main)")
-    model = ASRModel.from_pretrained(model_name=BASE_MODEL, map_location="cpu")
-    print(f"[OK] {type(model).__name__} loaded")
+    print(f"[1/4] Downloading {BASE_MODEL} .nemo checkpoint")
+    ckpt_dir = Path(MOUNT) / "models" / "nemotron-3.5-asr"
+    snapshot_download(BASE_MODEL, local_dir=str(ckpt_dir))
+    nemo_files = list(ckpt_dir.glob("*.nemo"))
+    if not nemo_files:
+        return {"status": "error", "stage": "download", "error": "no .nemo in snapshot"}
+    base_nemo = nemo_files[0].as_posix()
+    volume.commit()
 
-    cfg = model.cfg
-    with open_dict(cfg):
-        ds_common = {
-            "sample_rate": 16000, "batch_size": batch_size, "num_workers": 4,
-            "max_duration": 25.0, "min_duration": 0.1, "shuffle": True,
-            "is_tarred": False, "use_start_end_token": True,
-        }
-        cfg.train_ds = OmegaConf.create({**ds_common,
-                                         "manifest_filepath": manifests["train"]})
-        cfg.validation_ds = OmegaConf.create({**ds_common, "shuffle": False,
-                                              "manifest_filepath": manifests["validation"]})
-        cfg.optim = OmegaConf.create({
-            "name": "adamw", "lr": lr, "betas": [0.9, 0.98], "weight_decay": 0.001,
-            "sched": {"name": "CosineAnnealing", "max_steps": epochs * 1000,
-                      "min_lr": lr * 0.01, "warmup_steps": 500},
-        })
-        # blog's balanced streaming preset (~320 ms)
-        if hasattr(model, "encoder") and hasattr(model.encoder, "att_context_size"):
-            cfg.encoder.att_context_size = [56, 3]
+    exp_dir = Path(NEMOTRON_DIR) / "exp"
+    exp_dir.mkdir(parents=True, exist_ok=True)
+    cfg_dir = "/opt/NeMo/examples/asr/conf/fastconformer/cache_aware_streaming"
+    script = "/opt/NeMo/examples/asr/speech_to_text_finetune.py"
 
-    model.setup_training_data(train_data_config=cfg.train_ds)
-    model.setup_validation_data(val_data_config=cfg.validation_ds)
-    model.setup_optimization(optim_config=cfg.optim)
+    print(f"[2/4] Launching official fine-tune (target_lang={TARGET_LANG})")
+    cmd = [
+        sys.executable, script,
+        "--config-path", cfg_dir,
+        "--config-name", "fastconformer_transducer_bpe_streaming_prompt",
+        f"+init_from_nemo_model={base_nemo}",
+        f"++model.train_ds.manifest_filepath={manifests['train']}",
+        f"++model.validation_ds.manifest_filepath={manifests['validation']}",
+        f"++model.train_ds.batch_size={batch_size}",
+        f"++model.validation_ds.batch_size={batch_size}",
+        f"++model.optim.lr={lr}",
+        f"trainer.max_epochs={epochs}",
+        "trainer.devices=1",
+        "trainer.precision=bf16-mixed",
+        f"++exp_manager.exp_dir={exp_dir.as_posix()}",
+        "++exp_manager.create_wandb_logger=false",
+    ]
+    print(" ".join(cmd), flush=True)
+    rc = subprocess.run(cmd, cwd="/opt/NeMo").returncode
+    volume.commit()
+    if rc != 0:
+        return {"status": "error", "stage": "train", "rc": rc}
 
-    out_dir = Path(NEMOTRON_DIR) / "checkpoints"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    trainer = pl.Trainer(
-        max_epochs=epochs, accelerator="gpu", devices=1, precision="bf16-mixed",
-        log_every_n_steps=50, val_check_interval=1.0, num_sanity_val_steps=2,
-        callbacks=[LearningRateMonitor(),
-                   ModelCheckpoint(dirpath=str(out_dir), save_top_k=1,
-                                   monitor="val_wer", mode="min")],
-    )
-    model.set_trainer(trainer)
+    print("[3/4] Collecting artifacts")
+    nemos = sorted(exp_dir.rglob("*.nemo"), key=lambda p: p.stat().st_mtime)
+    final = nemos[-1].as_posix() if nemos else None
 
-    print(f"[2/5] Training {epochs} epochs, target_lang={TARGET_LANG}")
-    trainer.fit(model)
-
-    print("[3/5] Validation")
-    val = trainer.validate(model)
-    val_wer = val[0].get("val_wer") if val else None
-
-    print("[4/5] Test")
-    with open_dict(cfg):
-        cfg.test_ds = OmegaConf.create({**{k: v for k, v in
-                                           dict(cfg.validation_ds).items()},
-                                        "manifest_filepath": manifests["test"]})
-    model.setup_test_data(test_data_config=cfg.test_ds)
-    test = trainer.test(model)
-
-    print("[5/5] Save")
-    final = out_dir / "nemotron_wolof_v1.nemo"
-    model.save_to(str(final))
     summary = {
         "base_model": BASE_MODEL, "target_lang": TARGET_LANG, "epochs": epochs,
-        "val_wer": val_wer, "test": test, "final_ckpt": final.as_posix(),
+        "final_ckpt": final, "exp_dir": exp_dir.as_posix(),
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
-    (out_dir / "run_summary.json").write_text(json.dumps(summary, indent=2, default=str))
+    (Path(NEMOTRON_DIR) / "run_summary.json").write_text(
+        json.dumps(summary, indent=2, default=str))
     volume.commit()
-    try:
-        import wandb
-        w = wandb.init(project="yaatal-ears", name="nemotron-v1-wolof",
-                       config={"base": BASE_MODEL, "epochs": epochs, "lr": lr})
-        w.log({"val_wer": val_wer or -1})
-        w.finish()
-    except Exception as e:
-        print(f"[wandb] skipped: {e}")
-    print(json.dumps(summary, indent=1, default=str))
+    print("[4/4]", json.dumps(summary, indent=1, default=str))
     return summary
 
 
