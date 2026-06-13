@@ -272,7 +272,7 @@ def finetune_asr(
     from nemo.collections.asr.models import ASRModel
     from nemo.utils import logging as nemo_logging
     from omegaconf import OmegaConf
-    from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
+    from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 
     # Paths
     ckpt_dir = CHECKPOINT_DIR / exp_name
