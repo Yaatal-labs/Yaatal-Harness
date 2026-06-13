@@ -66,7 +66,10 @@ app = modal.App(APP_NAME, image=image)
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 DATASET_NAME = "galsenai/wolof-audio-data"
-BASE_MODEL = "nvidia/nemotron-3.5-asr-streaming-0.6b"
+# Nemotron 3.5 streaming carries prompt_kernel weights that stable NeMo (2.3.x)
+# cannot load; Parakeet-TDT is the RobotsMali-proven base for this NeMo line
+# (their Bambara soloni models). Revisit Nemotron when NeMo catches up.
+BASE_MODEL = "nvidia/parakeet-tdt-0.6b-v2"
 MOUNT_PATH = Path("/mnt/yaatal")
 OUTPUT_DIR = MOUNT_PATH / "output"
 CHECKPOINT_DIR = OUTPUT_DIR / "nemo-asr" / "checkpoints"
@@ -263,7 +266,7 @@ def finetune_asr(
     from datetime import datetime, timezone
 
     import pytorch_lightning as pl
-    from nemo.collections.asr.models import EncDecRNNTBPEModel
+    from nemo.collections.asr.models import ASRModel
     from nemo.utils import logging as nemo_logging
     from omegaconf import OmegaConf
     from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
@@ -286,7 +289,8 @@ def finetune_asr(
     print(f"[1/5] Loading base model: {BASE_MODEL}")
     start = time.time()
     try:
-        model = EncDecRNNTBPEModel.from_pretrained(model_name=BASE_MODEL, map_location="cpu")
+        # ASRModel resolves the checkpoint's own class (TDT/hybrid/RNNT variants)
+        model = ASRModel.from_pretrained(model_name=BASE_MODEL, map_location="cpu")
     except Exception as exc:
         print(f"[FATAL] Model load failed: {exc}")
         traceback.print_exc()
