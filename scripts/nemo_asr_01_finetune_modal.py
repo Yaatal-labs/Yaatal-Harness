@@ -266,7 +266,9 @@ def finetune_asr(
     import traceback
     from datetime import datetime, timezone
 
-    import pytorch_lightning as pl
+    # NeMo 2.3 models subclass lightning.pytorch's LightningModule; importing
+    # the parallel pytorch_lightning package makes Trainer reject them
+    import lightning.pytorch as pl
     from nemo.collections.asr.models import ASRModel
     from nemo.utils import logging as nemo_logging
     from omegaconf import OmegaConf
