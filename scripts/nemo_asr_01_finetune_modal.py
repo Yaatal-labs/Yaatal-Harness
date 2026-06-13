@@ -239,6 +239,7 @@ def create_manifests(
         json.dump(summary, f, indent=2)
     
     print(f"\n[OK] Total: {total_samples} samples | {total_hours:.2f} hours")
+    volume.commit()  # without this the writes die with the container
     return summary
 
 
@@ -440,7 +441,7 @@ def finetune_asr(
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
     (version_dir / "run_summary.json").write_text(json.dumps(summary, indent=2))
-    
+    volume.commit()
     print(f"\n[OK] Run complete. Outputs: {version_dir}")
     return summary
 
