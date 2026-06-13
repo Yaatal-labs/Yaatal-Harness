@@ -96,7 +96,7 @@ def _run_cmd(cmd: list[str], cwd: Path | None = None, env: dict | None = None) -
 )
 def create_manifests(
     dataset_name: str = DATASET_NAME,
-    output_dir: str = str(MANIFEST_DIR),
+    output_dir: str = MANIFEST_DIR.as_posix(),
     val_fraction: float = 0.1,
     test_fraction: float = 0.1,
 ) -> dict:
@@ -460,18 +460,20 @@ def main(
     
     if not skip_manifest:
         print("\n=== Phase 1: Create Manifests ===")
+        # .as_posix(): this entrypoint runs on Windows; str(Path) would ship
+        # backslash paths into the Linux container
         manifest_result = create_manifests.remote(
             dataset_name=DATASET_NAME,
-            output_dir=str(MANIFEST_DIR),
+            output_dir=MANIFEST_DIR.as_posix(),
         )
         print(f"Manifests created: {manifest_result}")
     else:
         print("\n=== Phase 1: Skipped (using existing manifests) ===")
         manifest_result = {
             "manifests": {
-                "train": str(MANIFEST_DIR / "wolof_nemo_manifest_train.jsonl"),
-                "validation": str(MANIFEST_DIR / "wolof_nemo_manifest_validation.jsonl"),
-                "test": str(MANIFEST_DIR / "wolof_nemo_manifest_test.jsonl"),
+                "train": (MANIFEST_DIR / "wolof_nemo_manifest_train.jsonl").as_posix(),
+                "validation": (MANIFEST_DIR / "wolof_nemo_manifest_validation.jsonl").as_posix(),
+                "test": (MANIFEST_DIR / "wolof_nemo_manifest_test.jsonl").as_posix(),
             }
         }
 
