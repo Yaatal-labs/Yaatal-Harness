@@ -334,21 +334,24 @@ def finetune_asr(
         "freq_width": 27,
         "time_width": 0.05,
     })
-    cfg.optim = OmegaConf.create({
-        "_target_": "torch.optim.AdamW",
-        "lr": lr,
-        "betas": [0.9, 0.98],
-        "weight_decay": 0.001,
-    })
-    cfg.scheduler = OmegaConf.create({
-        "_target_": "nemo.core.optim.lr_scheduler.CosineAnnealing",
-        "max_steps": epochs * 1000,
-        "min_lr": lr * 0.01,
-        "warmup_steps": 500,
-        "warmup_ratio": None,
-    })
-    cfg.decoder = cfg.get("decoder", OmegaConf.create({}))
-    cfg.decoder.fastemit_lambda = 0.001
+    # NeMo expects the scheduler nested under optim.sched (not a top-level key),
+    # and the checkpoint cfg is struct-locked against new keys
+    from omegaconf import open_dict
+    with open_dict(cfg):
+        cfg.optim = OmegaConf.create({
+            "name": "adamw",
+            "lr": lr,
+            "betas": [0.9, 0.98],
+            "weight_decay": 0.001,
+            "sched": {
+                "name": "CosineAnnealing",
+                "max_steps": epochs * 1000,
+                "min_lr": lr * 0.01,
+                "warmup_steps": 500,
+            },
+        })
+        cfg.decoder = cfg.get("decoder", OmegaConf.create({}))
+        cfg.decoder.fastemit_lambda = 0.001
 
     if use_lora:
         print("[2/5] LoRA mode: freezing encoder")
