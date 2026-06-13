@@ -58,7 +58,8 @@ image = (
         "numpy>=1.26",
         "scipy>=1.11",
     )
-    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1"})
+    .env({"HF_HUB_ENABLE_HF_TRANSFER": "1",
+          "NUMBA_CUDA_USE_NVIDIA_BINDING": "1"})
 )
 
 app = modal.App(APP_NAME, image=image)
@@ -373,7 +374,7 @@ def finetune_asr(
         max_epochs=epochs,
         accelerator="gpu",
         devices=1,
-        precision="16-mixed",
+        precision="bf16-mixed",  # RNNT loss segfaults in fp16 without numba NVIDIA binding
         default_root_dir=str(ckpt_dir),
         enable_checkpointing=True,
         callbacks=[
