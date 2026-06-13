@@ -116,6 +116,7 @@ def finetune(epochs: int = 10, lr: float = 1e-4, batch_size: int = 8) -> dict:
         f"++model.train_ds.batch_size={batch_size}",
         f"++model.validation_ds.batch_size={batch_size}",
         f"++model.optim.lr={lr}",
+        "++model.optim.sched.d_model=1024",  # YAML interpolates ${model.encoder.d_model}; unresolvable here
         f"trainer.max_epochs={epochs}",
         "trainer.devices=1",
         "trainer.precision=bf16-mixed",
