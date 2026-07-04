@@ -2,7 +2,7 @@
 
 **Yaatal-Harness is the AI control plane of Yaatal.** It is where agent runtimes get their
 capabilities, where AI behavior becomes auditable, where policy is enforced at run time, and where
-the system's own metrics and feedback feed back in to make Yaatal self-improving. This is
+the system's own metrics and feedback flow back in to make Yaatal self-improving. This is
 AI-native software: the control loop is the product, not an add-on to it.
 
 ## Charter: four functions

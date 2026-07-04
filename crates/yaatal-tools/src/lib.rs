@@ -9,6 +9,7 @@
 //! - Max steps limiting (prevents infinite loops)
 //! - Session persistence for long-running agents
 //! - [`intent_router`]: Intent-based tool routing (Picovoice pattern)
+//! - [`audited_exec`]: Policy-gated, audited external-CLI execution (docs/CLI-FIRST-TOOLS.md)
 //!
 //! ## Example
 //!
@@ -27,6 +28,7 @@
 //! }
 //! ```
 
+pub mod audited_exec;
 pub mod intent_router;
 
 use async_trait::async_trait;
@@ -840,9 +842,9 @@ impl Tool for SearchTool {
 // SESSION NOTE TOOL (From MiniMax mini-agent research)
 // =============================================================================
 
-/// Session note tool for persisting progress across sessions.
-/// Based on MiniMax's mini-agent SessionNoteTool.
-/// This enables long-running agents to maintain state between sessions.
+// Session note tool for persisting progress across sessions.
+// Based on MiniMax's mini-agent SessionNoteTool.
+// This enables long-running agents to maintain state between sessions.
 
 /// In-memory session notes store.
 /// In production, this could be backed by a file or database.
@@ -1000,8 +1002,8 @@ impl ToolCallParser {
         for block in text.split("```") {
             let trimmed = block.trim();
             if trimmed.starts_with("json") || trimmed.starts_with('{') {
-                let content = if trimmed.starts_with("json") {
-                    trimmed[4..].trim()
+                let content = if let Some(stripped) = trimmed.strip_prefix("json") {
+                    stripped.trim()
                 } else {
                     trimmed
                 };

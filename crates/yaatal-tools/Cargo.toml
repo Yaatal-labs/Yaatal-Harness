@@ -5,6 +5,9 @@ edition = "2021"
 
 [dependencies]
 yaatal-core = { path = "../yaatal-core" }
+yaatal-audit = { path = "../yaatal-audit" }
+yaatal-policy = { path = "../yaatal-policy" }
+uuid = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

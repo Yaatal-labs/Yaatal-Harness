@@ -2019,7 +2019,6 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
- "tracing",
  "uuid",
  "yaatal-core",
  "yaatal-tools",
@@ -2101,6 +2100,8 @@ dependencies = [
  "async-trait",
  "tokio",
  "tracing",
+ "uuid",
+ "yaatal-audit",
  "yaatal-core",
 ]
 
@@ -2139,7 +2140,10 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "urlencoding",
+ "uuid",
+ "yaatal-audit",
  "yaatal-core",
+ "yaatal-policy",
 ]
 
 [[package]]

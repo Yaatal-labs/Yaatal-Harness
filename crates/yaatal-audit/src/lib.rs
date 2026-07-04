@@ -1,20 +1,24 @@
 //! Audit segment of the Yaatal control loop.
 //!
-//! This crate is **CONTROL-LOOP slice 1** (see `docs/CONTROL-LOOP.md` in the workspace
-//! root): the audit spine. It defines the `AuditEvent` schema, the `AuditStore` trait
-//! (with an in-memory and a JSONL-file implementation), and an adapter that turns
-//! `yaatal-tools`' existing `Observer`/`PipelineEvent` hook into `AuditEvent`s.
+//! This crate started as **CONTROL-LOOP slice 1** (see `docs/CONTROL-LOOP.md` in the
+//! workspace root): the audit spine. It defines the `AuditEvent` schema, the `AuditStore`
+//! trait (with an in-memory and a JSONL-file implementation), an adapter that turns
+//! `yaatal-tools`' existing `Observer`/`PipelineEvent` hook into `AuditEvent`s, and (slice
+//! 2) a [`metrics`] module that rolls those events up into per-run / per-time-range
+//! aggregates.
 //!
-//! **Autonomy level: L0 (observe-only).** This crate only records and reads back what
-//! already happened. It contains:
-//! - no policy enforcement (that is `yaatal-policy`'s `ToolPolicy`, CONTROL-LOOP slice 3
-//!   — not implemented yet; `PolicyVerdict` below is a placeholder field type so
-//!   `AuditEvent` has somewhere to put a verdict once that slice lands),
+//! **Autonomy level: L0 (observe + aggregate).** This crate records what already
+//! happened and computes plain aggregates over it. It contains:
+//! - no policy *enforcement* (that is `yaatal-policy`'s `ToolPolicy`, CONTROL-LOOP
+//!   slice 3 — `PolicyVerdict` below is the concrete type `yaatal-policy` now records on
+//!   `AuditEvent::policy_verdicts`, but this crate never decides Allow/Deny itself),
 //! - no eval scoring (CONTROL-LOOP slice 4, `yaatal-evals`),
 //! - no config mutation or proposal generation (CONTROL-LOOP slice 5).
 //!
 //! Every event this crate writes is either empty of `policy_verdicts` or carries verdicts
 //! handed to it by a caller — this crate never decides Allow/Deny itself.
+
+pub mod metrics;
 
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{File, OpenOptions};
@@ -36,17 +40,34 @@ use yaatal_core::{Observer, ObserverError, PipelineEvent};
 /// input/output, never the raw text — see CONTROL-LOOP.md's "digests, not payloads"
 /// invariant (audit records must not become a second copy of user data).
 ///
+/// These digests are **correlation identifiers only**: good enough to tell "same input
+/// again" from "different input" within one audit trail, not a cryptographic commitment.
+/// They are not collision-resistant, and — because this uses `std::hash::Hasher`'s
+/// default algorithm (currently SipHash-1-3) rather than a documented, version-stable
+/// algorithm — not guaranteed stable across Rust toolchain versions either. Do not treat
+/// the `stdhash:` prefix as a promise the same input hashes the same way after a rustc
+/// upgrade.
+///
 /// ponytail: `sha2` is not in this workspace's dependency tree (checked `Cargo.lock`), so
-/// rather than add a new dependency for an L0 scaffold this uses
-/// `std::hash::Hasher`'s SipHash-1-3 (64-bit, fixed key -> deterministic across runs, but
-/// not cryptographically collision-resistant). It still satisfies "never leak the raw
-/// payload" — a length+prefix digest would not. Upgrade path: swap this function's body
-/// for `sha2::Sha256` if a workspace crate ever already depends on it, or once real
-/// collision-resistance is needed (e.g. content-addressed dedup across untrusted input).
+/// rather than add a new dependency for an L0 scaffold this uses the standard library's
+/// `Hasher`. It still satisfies "never leak the raw payload" — a length+prefix digest
+/// would not. Upgrade path: swap this function's body for `sha2::Sha256` if a workspace
+/// crate ever already depends on it, or once real collision-resistance / cross-version
+/// stability is needed (e.g. content-addressed dedup across untrusted input, or digests
+/// compared across a Rust upgrade).
 pub fn digest(payload: &str) -> String {
     let mut hasher = DefaultHasher::new();
     payload.hash(&mut hasher);
-    format!("siphash13:{:016x}", hasher.finish())
+    format!("stdhash:{:016x}", hasher.finish())
+}
+
+/// Convert a `u64` millisecond duration to the `i64` `chrono::Duration::milliseconds`
+/// wants, clamping instead of wrapping. A `u64` latency larger than `i64::MAX` cannot
+/// come from a real clock reading in this process's lifetime, but a clamp is one line
+/// and turns "would-never-happen" into "provably can't produce a bogus negative
+/// `started_at`" rather than trusting the never-happens assumption.
+fn clamp_ms_to_i64(ms: u64) -> i64 {
+    i64::try_from(ms).unwrap_or(i64::MAX)
 }
 
 // =============================================================================
@@ -54,7 +75,10 @@ pub fn digest(payload: &str) -> String {
 // =============================================================================
 
 /// The category of action an `AuditEvent` records, per CONTROL-LOOP.md's proposed schema.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+///
+/// `Hash` is derived (beyond what slice 1 needed) so [`metrics::compute`] can group
+/// events into a `HashMap<ActionKind, usize>` without a second parallel key type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ActionKind {
     ModelCall,
     ToolCall,
@@ -62,18 +86,24 @@ pub enum ActionKind {
     EvalScore,
 }
 
-/// Placeholder for the verdict a policy gate reaches about an action.
+/// The verdict a policy gate reaches about an action.
 ///
-/// ponytail: the real gate (`ToolPolicy` — tool allowlist + per-run spend cap) is
-/// CONTROL-LOOP slice 3, owned by `yaatal-policy`, and does not exist yet. This enum
-/// exists only so `AuditEvent::policy_verdicts` has a concrete type to hold once slice 3
-/// lands; every event this L0 crate produces carries an empty `policy_verdicts` list
-/// (docs/CONTROL-LOOP.md: "empty if this event predates a gate").
+/// `yaatal-policy`'s `ToolPolicy` (CONTROL-LOOP slice 3 — tool allowlist + per-run spend
+/// cap) is the gate that produces these; this crate only defines the type so
+/// `AuditEvent::policy_verdicts` has somewhere to put it, and never decides Allow/Deny
+/// itself (docs/CONTROL-LOOP.md: "empty if this event predates a gate").
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PolicyVerdict {
     Allow,
     Deny(String),
     AllowWithCap(f64),
+}
+
+impl PolicyVerdict {
+    /// `true` for `Deny` — the one branch that means "the action must not execute."
+    pub fn is_deny(&self) -> bool {
+        matches!(self, PolicyVerdict::Deny(_))
+    }
 }
 
 /// One audited action: a model call, a tool call, a policy check, or an eval score.
@@ -390,7 +420,7 @@ impl Observer for ToolAuditObserver {
 
         let run_id = Uuid::parse_str(&request_id).unwrap_or_else(|_| Uuid::new_v4());
         let completed_at = Utc::now();
-        let started_at = completed_at - Duration::milliseconds(duration_ms as i64);
+        let started_at = completed_at - Duration::milliseconds(clamp_ms_to_i64(duration_ms));
 
         let audit_event = AuditEvent {
             event_id: Uuid::new_v4(),
@@ -435,7 +465,7 @@ pub async fn audit_tool_call(
         Err(err) => (err, false),
     };
     let completed_at = Utc::now();
-    let started_at = completed_at - Duration::milliseconds(latency_ms as i64);
+    let started_at = completed_at - Duration::milliseconds(clamp_ms_to_i64(latency_ms));
     let event = AuditEvent {
         event_id: Uuid::new_v4(),
         run_id,
@@ -475,7 +505,7 @@ pub async fn audit_model_call(
         Err(err) => (err, false),
     };
     let completed_at = Utc::now();
-    let started_at = completed_at - Duration::milliseconds(latency_ms as i64);
+    let started_at = completed_at - Duration::milliseconds(clamp_ms_to_i64(latency_ms));
     let event = AuditEvent {
         event_id: Uuid::new_v4(),
         run_id,
