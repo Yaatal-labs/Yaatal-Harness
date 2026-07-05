@@ -95,6 +95,69 @@ Channels are the commodity; **governed, sovereign, auditable action is the moat.
 Items 1–2 are pure Rust in the Harness, no external access needed → build now.
 Item 3 waits on the Meta path decision (it's the integration surface).
 
+## Tradeoffs & risk (the eyes-open version)
+
+### Meta Business Agent — decided YES, but it is a *channel, not a home*
+
+Real tradeoffs, and one sharp tension with Yaatal's own thesis:
+
+1. **Disintermediation.** Meta's agent owns the conversation, the customer
+   relationship, and the conversational data. Yaatal becomes a backend. That
+   conversational data *is* the voice-data/consent moat — routing it through
+   Meta hands the top of the funnel (and the corpus) to Meta.
+2. **Sovereignty tension — the sharp one.** Yaatal's entire pitch (NDT, grants,
+   government) is *sovereign, data stays in Africa*. Meta's agent runs on
+   global infra. Never route the sovereign / Wolof-voice / consent-data flows
+   through it — that would contradict the thesis you sell.
+3. **Cost + control.** ~4–5¢/message, Meta sets the price (free → billing Aug 1;
+   they can raise it), thin African-commerce margins feel it.
+4. **Wedge reach vs erosion.** Meta's agent is text-first — it does **not** serve
+   your non-literate voice sellers, so riding it reaches the *literate/text/
+   diaspora* segment, not your core wedge. And Orange is already doing Wolof AI
+   with OpenAI/Meta (landscape doc) — Meta could erode the voice wedge from above
+   over time.
+
+**Resolution:** ride Meta as a **distribution channel for the text/literate
+segment** (fast "live," real reach), but keep the **sovereign Wolof-voice path as
+the owned, differentiated product and the only home for consent-data**. Meta is a
+front door, not *the* front door. This is the strategy docs' "mini-app on the
+super-apps" posture — ride the rails, don't become dependent, don't route the
+crown jewels through them.
+
+### ZeroClaw — bite-back check
+
+- **License: clean.** Dual **MIT OR Apache-2.0** — no copyleft, no commercial
+  restriction. You may fork, modify, keep your additions proprietary, ship
+  commercially. The upstream **CLA** only governs contributing *back*; it cannot
+  claw back the version you fork — the existing MIT/Apache release is
+  irrevocable. ✅ No copyright/license risk.
+- **The real risk is maturity, not law.** Open-sourced **2026-02-19** (~4½ months
+  old), community-led (@theonlyhennygod created, @JordanTheJet leads; no big-co
+  backing), and one of several OpenClaw reimplementations (NanoClaw, Moltis…).
+  Risks: API churn, breaking changes, small bus factor, possible
+  abandonment/consolidation. "Known secure and working" is optimistic for
+  something this young — it's *promising and permissively licensed*, not battle-
+  hardened.
+- **Security surface.** It executes shell/browser/hardware. Audit the subset you
+  adopt (sandbox + tool-exec especially) — don't blind-trust a young runtime in a
+  payments-adjacent stack.
+
+**Decision: FORK and pin — do not live-depend on upstream.** Vendor ZeroClaw at a
+known-good commit, take the subset (channels + sandbox + signed receipts + SOP
+patterns), audit it, and pull upstream patches *selectively*. Forking:
+(a) satisfies **sovereignty** (you own and self-host the runtime),
+(b) **insulates** you from upstream churn / relicensing / abandonment, and
+(c) is explicitly **permitted** by the license. This is exactly what large labs
+do with permissive upstreams — adopt the working core, own the fork. Yaatal-
+Harness stays the governance + sovereignty + commerce + evals layer *on top of*
+the forked runtime.
+
+**First fork step (concrete):** vendor `zeroclaw-channels` + the sandbox +
+receipt modules into a `yaatal-runtime/` (fork), wire one channel (WhatsApp or
+CLI) through the existing `ToolPolicyGate` + audit, prove one governed round
+trip. Then delete/park the from-scratch `SocialGateway` build — the forked
+channel trait replaces it.
+
 ## Non-goals (reaffirmed + new)
 
 - No from-scratch WhatsApp conversational agent (Meta commoditized it).
