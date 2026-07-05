@@ -158,6 +158,45 @@ CLI) through the existing `ToolPolicyGate` + audit, prove one governed round
 trip. Then delete/park the from-scratch `SocialGateway` build — the forked
 channel trait replaces it.
 
+## Timing — the YAGNI verdict (do NOT build the runtime/fork yet)
+
+Ran the two options up the Ponytail ladder honestly:
+
+- **Extend Harness with a from-scratch gateway now** → rebuilds ZeroClaw *and*
+  serves no live load. Fails rung 1 and rung 2.
+- **Fork ZeroClaw now** → takes on the maintenance + security-audit burden of a
+  4½-month-old runtime for **zero live channels**. The thing that would *consume*
+  a multi-channel runtime — Yaatal's own sovereign agent / Wolof-voice product —
+  **isn't built yet**. So this is a solution looking for a load. That's the
+  *cop-out* kind of lazy (reach for a shiny dep to feel productive), not the
+  *disciplined* kind.
+
+**Verdict: neither now. This is disciplined YAGNI, not procrastination —**
+because the durable, cheap-to-do-early parts are **already done**:
+1. the `SocialGateway`/`SocialEvent` contract is **designed** (`SOCIAL-GATEWAYS.md`),
+2. the custody layer (`ToolPolicyGate` + `AuditEvent` + `AuditedExec`) **exists
+   and is channel-agnostic** — nothing couples to a specific platform, so
+   adopting a channel later is cheap,
+3. the fork-when-needed decision is **recorded** (above).
+
+Deferring is not just neutral — it **compounds in our favour**: fork ZeroClaw
+later and you fork a **more battle-tested** runtime (today it's 4½ months old),
+you fork **only the one channel you actually need** (not 30), and you audit less.
+YAGNI here literally makes the eventual adoption cheaper and safer.
+
+**The trigger to build (any one of these):**
+- a real seller needs WhatsApp/social order-taking on the **sovereign voice
+  path** that Meta's agent doesn't serve (non-literate, Wolof), **with volume**; or
+- the ops runner needs to drive tools/channels beyond the `yaatal` CLI; or
+- the Meta partnership lands → build the **thin Engine agent-commerce facade**
+  (a few endpoints, *not* the runtime) against the real partner spec.
+
+Until a trigger fires, the **one** governed workload (the ops runner over the
+CLI) is enough. Don't fork a runtime to police channels that don't exist yet.
+
+**The only time-boxed item** is the Meta partner free window (Aug 1) — and that's
+a partnerships action + a thin facade, decoupled from the runtime question above.
+
 ## Non-goals (reaffirmed + new)
 
 - No from-scratch WhatsApp conversational agent (Meta commoditized it).
