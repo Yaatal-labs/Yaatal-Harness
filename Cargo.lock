@@ -2042,8 +2042,12 @@ dependencies = [
 name = "yaatal-evals"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
+ "uuid",
+ "yaatal-audit",
  "yaatal-core",
 ]
 
@@ -2103,6 +2107,23 @@ dependencies = [
  "uuid",
  "yaatal-audit",
  "yaatal-core",
+]
+
+[[package]]
+name = "yaatal-runner"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "uuid",
+ "yaatal-audit",
+ "yaatal-core",
+ "yaatal-evals",
+ "yaatal-policy",
+ "yaatal-tools",
 ]
 
 [[package]]

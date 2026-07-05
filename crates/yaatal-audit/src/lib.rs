@@ -13,12 +13,15 @@
 //!   slice 3 — `PolicyVerdict` below is the concrete type `yaatal-policy` now records on
 //!   `AuditEvent::policy_verdicts`, but this crate never decides Allow/Deny itself),
 //! - no eval scoring (CONTROL-LOOP slice 4, `yaatal-evals`),
-//! - no config mutation or proposal generation (CONTROL-LOOP slice 5).
+//! - no config mutation. The [`proposals`] module (CONTROL-LOOP slice 5) *generates*
+//!   L1 `ConfigProposal` artifacts — data a human reviews — but nothing in this
+//!   workspace applies one.
 //!
 //! Every event this crate writes is either empty of `policy_verdicts` or carries verdicts
 //! handed to it by a caller — this crate never decides Allow/Deny itself.
 
 pub mod metrics;
+pub mod proposals;
 
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{File, OpenOptions};

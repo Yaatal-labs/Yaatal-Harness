@@ -1,7 +1,11 @@
 //! Evaluation utilities for the Yaatal AI harness.
 //!
-//! This crate provides simple metrics for evaluating ranking quality.
-//! Use these helpers in offline experiments or during A/B testing.
+//! This crate provides simple metrics for evaluating ranking quality, plus the
+//! [`ops_run`] module (CONTROL-LOOP slice 4) that scores an operational agent run
+//! from its audit trail. Use these helpers in offline experiments or during A/B
+//! testing.
+
+pub mod ops_run;
 
 use yaatal_core::ScoredCandidate;
 
@@ -27,10 +31,10 @@ pub fn ndcg_at_k(rankings: &[ScoredCandidate], relevant_ids: &[String], k: usize
     }
     let mut dcg = 0.0;
     let mut idcg = 0.0;
-    for i in 0..k {
+    for (i, ranked) in rankings.iter().take(k).enumerate() {
         let rank = i + 1;
         let log_denom = (rank as f32 + 1.0).log2();
-        if relevant_ids.contains(&rankings[i].candidate.id) {
+        if relevant_ids.contains(&ranked.candidate.id) {
             dcg += 1.0 / log_denom;
         }
         if i < relevant_ids.len() {

@@ -25,7 +25,11 @@ use crate::{ActionKind, AuditError, AuditEvent, AuditStore};
 /// Rollup over a set of `AuditEvent`s — a run, a time range, or any other slice a caller
 /// assembles. All fields are computed fresh from the input slice; nothing here is
 /// incremental or cached (see module ponytail note).
-#[derive(Debug, Clone, PartialEq, Default)]
+///
+/// Serde derives exist so callers (e.g. `yaatal-runner`'s one-JSON-summary contract) can
+/// embed a rollup in structured output; `ActionKind` map keys serialize as their variant
+/// names.
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct AuditMetrics {
     /// Number of events in the slice.
     pub event_count: usize,
