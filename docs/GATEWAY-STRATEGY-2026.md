@@ -158,6 +158,65 @@ CLI) through the existing `ToolPolicyGate` + audit, prove one governed round
 trip. Then delete/park the from-scratch `SocialGateway` build — the forked
 channel trait replaces it.
 
+## Scope correction (founder, decisive) — WhatsApp is day-one, not deferred
+
+The earlier "defer everything" verdict conflated two different things and was
+wrong on one of them. Separate them:
+
+- **A multi-channel RUNTIME / ZeroClaw fork (all ~30 channels)** — defer. Nobody
+  wants 26 useless channels; the full runtime (agent loop, SOP, providers,
+  memory) duplicates Harness+Engine.
+- **A WhatsApp CHANNEL** — **do NOT defer.** WhatsApp is the substrate of African
+  commerce and the way Yaatal reaches users *from the beginning*. It is the load,
+  not infrastructure-ahead-of-load. Target scope is **WhatsApp now; maybe
+  Telegram / Discord / iMessage later — never 30.**
+
+### The flipped verdict: own thin adapters > fork ZeroClaw (at 4 channels)
+
+At ~4 wanted channels, **extend the Harness with thin per-channel adapters behind
+the custody we already have — do not fork ZeroClaw.** Reasons:
+
+1. Forking a 30-channel runtime to use 4 means carrying, auditing, and
+   maintaining 26 channels of code you'll never run. That is the *opposite* of
+   Ponytail — a bigger surface, not a smaller one.
+2. Each adapter is small and self-contained: WhatsApp Cloud API = a webhook + a
+   POST; Telegram Bot API is famously trivial; Discord/iMessage similar. This is
+   rung 6–7 work (small focused code), and you **own** it — sovereign, no upstream
+   churn, no CLA, no abandonment risk.
+3. The `SocialGateway` trait (`SOCIAL-GATEWAYS.md`) is already the right seam;
+   each adapter implements it. **Mirror ZeroClaw's adapter *pattern*** (read its
+   whatsapp channel for the shape) — don't vendor its whole runtime.
+
+Fork ZeroClaw only if you ever want *many* channels **and** its runtime pieces
+(agent loop/SOP/providers/memory) — which you don't, because Harness + Engine
+already are that. So: **mirror the pattern, own the adapters.**
+
+### Two WhatsApp paths, complementary (not either/or)
+
+- **Outbound transactional (day one, sovereign, Yaatal-owned):** order confirmed,
+  delivery code, payment released, buyer replies. This is a **small extension of
+  the Engine's existing notification service** (add a WhatsApp channel to
+  `notifications_service`) — reuse, not new runtime (Ponytail rung 2). This is how
+  Yaatal reaches users *now*, and it keeps the consent-data on Yaatal's side.
+- **Inbound conversational (buyer "I want to buy X" → order):** ride **Meta's
+  agent** for the text/literate segment (fast, free-window); build Yaatal's own
+  Wolof-voice conversational path later. Defer the custom NLU agent, not the
+  channel.
+
+### Build order for WhatsApp (each small, committable)
+
+1. **WhatsApp outbound channel** in the Engine notifications service, config-gated
+   on `WHATSAPP_TOKEN`/`WHATSAPP_PHONE_ID` (no-op without them, so it compiles and
+   tests with no live creds). Sends the transactional messages above via Cloud API.
+2. **Inbound webhook receiver** (verify + parse) → normalize to `SocialEvent` →
+   route to the agent loop / Meta hand-off. Governed sends go through the policy +
+   audit gate.
+3. Telegram / Discord / iMessage → add adapters against the same trait **when a
+   real need appears**, one small file each.
+
+Founder track (parallel, unblocked by code): provision the WABA + phone number +
+token (Meta sandbox number needs no verification to start testing).
+
 ## Timing — the YAGNI verdict (do NOT build the runtime/fork yet)
 
 Ran the two options up the Ponytail ladder honestly:
