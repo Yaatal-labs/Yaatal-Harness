@@ -17,6 +17,7 @@ on the Contabo box and reachable over the tailnet.
 cd Yaatal-Harness
 cargo build --release -p yaatal-runner
 # → target/release/yaatal-ops-runner
+# → target/release/yaatal-proposals-push
 ```
 
 ## 2. Install the `yaatal` CLI (from the SDK)
@@ -115,6 +116,41 @@ journalctl -u yaatal-ops.service -n 50 --no-pager
 
 That is the switch. From here the Harness is **L0-operating**: a governed,
 audited, policy-gated run every morning against the live Engine.
+
+## 5.1 Push L1 proposals into Engine review
+
+The runner writes L1 suggestions to `proposals.jsonl`; Engine is the review
+system of record. Push the local JSONL file after a run:
+
+```bash
+YAATAL_ENGINE_URL=http://<magicdns-name>:5150 \
+YAATAL_TOKEN="$(cat /etc/yaatal/ops.env | sed -n 's/^YAATAL_TOKEN=//p')" \
+/opt/yaatal/yaatal-proposals-push /var/lib/yaatal/ops-audit/proposals.jsonl
+```
+
+The pusher only sends `Proposed` artifacts. Engine upserts by proposal id and
+does not overwrite already-decided proposals, so re-running this command is
+safe. The CLI prints one JSON summary to stdout: read count, pushed count, and
+skipped non-proposed count.
+
+To push proposals even when the runner exits `1` because the eval failed, use a
+small wrapper as the service `ExecStart`:
+
+```bash
+#!/usr/bin/env bash
+set +e
+/opt/yaatal/yaatal-ops-runner /etc/yaatal/daily-ops.json
+runner_rc=$?
+/opt/yaatal/yaatal-proposals-push /var/lib/yaatal/ops-audit/proposals.jsonl
+push_rc=$?
+if [ "$push_rc" -ne 0 ]; then
+  exit "$push_rc"
+fi
+exit "$runner_rc"
+```
+
+That preserves the runner's eval exit code while still moving review artifacts
+into Engine.
 
 ## 6. Read the trail
 

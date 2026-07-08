@@ -36,6 +36,8 @@ use yaatal_evals::ops_run::{OpsRunEval, OpsRunReport};
 use yaatal_policy::tool_policy::ToolPolicyGate;
 use yaatal_tools::audited_exec::{AuditedExec, ExecError};
 
+pub mod proposals_push;
+
 /// How many runs must show a pattern before the proposal generator fires (see
 /// `yaatal_audit::proposals::ProposalRules::min_runs`). A const, not a runbook knob:
 /// one fewer thing to mis-configure at L1, and 3 is the smallest count where

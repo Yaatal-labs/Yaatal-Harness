@@ -7,6 +7,10 @@ edition = "2021"
 name = "yaatal-ops-runner"
 path = "src/main.rs"
 
+[[bin]]
+name = "yaatal-proposals-push"
+path = "src/bin/proposals_push.rs"
+
 [dependencies]
 yaatal-core = { path = "../yaatal-core" }
 yaatal-audit = { path = "../yaatal-audit" }
@@ -19,3 +23,4 @@ tokio = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+reqwest = { workspace = true }
