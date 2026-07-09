@@ -72,6 +72,38 @@ This is also the division of labor for policy: the Engine's sovereignty type sys
 enforces **behavioral** policy at run time — what an agent may do with the capabilities it's given.
 Neither replaces the other.
 
+## Promotion & boundary rules
+
+*Distilled from the retired May-2026 engine-alignment draft, updated to the decision of record:
+Harness and Engine are two decoupled runtimes that exchange JSON over HTTP — e.g. the
+`crates/yaatal-runner` proposal push to Engine's `/api/harness/proposals` review endpoint — not
+crates compiled into each other. A capability crosses the boundary as an HTTP contract, never as a
+Cargo dependency in the direction Engine → Harness code, or Harness → Engine code.*
+
+**Promotion rule** — where new capability belongs:
+
+```text
+One app needs it            -> keep it in the app (YOKK, BOBO, Studio)
+Two apps need it             -> promote it to Engine (shared over Engine's HTTP API)
+Unproven AI capability       -> keep it in R&D Harness (this repo, pre-contract)
+Proven AI reliability logic  -> promote it to a stable Harness contract, exposed to Engine
+                                 over HTTP, not vendored as a crate
+```
+
+**Boundary rules:**
+
+- Harness does not own auth, profile identity, WebSocket transport, app routes, or deployment —
+  those stay Engine's.
+- Engine does not own YOKK-only, BOBO-only, or Studio-only product UX.
+- Apps should not duplicate core AI reliability logic that already has a Harness contract.
+- A Harness capability reaches Engine (and Engine reaches Harness, e.g. the proposal-review
+  endpoint) as a narrow, versioned HTTP contract — request/response JSON — never as compiled Rust
+  linked into the other repo's binary. This supersedes the older "Runtime Harness ships as crate
+  code inside Engine" model; the two runtimes stay separate processes, separate deploys, separate
+  failure domains.
+- R&D Harness records assumptions, eval results, and proof-of-work before anything is promoted to
+  a stable contract.
+
 ## Request / agent-action lifecycle
 
 1. **Engine Runtime**: A request arrives at Yaatal Engine, which owns authentication,
