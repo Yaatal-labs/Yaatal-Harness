@@ -23,6 +23,8 @@
 //! nightly audit trail shape depend on which step failed. Ops consequences belong to the
 //! eval verdict (exit code), not to step short-circuiting.
 
+mod engine_sync;
+
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -209,6 +211,10 @@ pub async fn execute(runbook: &Runbook) -> Result<RunSummary, RunnerError> {
     for proposal in &proposals {
         proposal_store.append(proposal)?;
     }
+
+    // Sync the whole proposal store to the Engine's review API, if configured — a
+    // no-op offline. See `engine_sync` module docs and `docs/OPS-RUNNER.md`.
+    engine_sync::sync_proposals_to_engine(&proposal_store).await;
 
     Ok(RunSummary {
         run_id,

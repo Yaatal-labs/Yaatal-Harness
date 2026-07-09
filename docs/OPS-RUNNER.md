@@ -92,6 +92,18 @@ StandardOutput=journal
 
 `/etc/yaatal/ops.env` (mode 0600, owner yaatal): `YAATAL_TOKEN=…`
 
+To also sync `proposals.jsonl` to the Engine's review API (`POST
+/api/harness/proposals`) so pending L1 proposals show up in the control-plane
+dashboard, add two more vars to the same file: `YAATAL_ENGINE_URL=…` (the same
+tailnet URL as above) and `YAATAL_ENGINE_TOKEN=…` (a JWT for the ops service
+account — separate from `YAATAL_TOKEN`, which is the `yaatal` CLI's own
+credential). Both must be set together or the runner skips the sync entirely
+and stays fully functional offline — this push is additive, not required.
+Every run re-pushes the whole proposal store; the Engine upserts each proposal
+by `id` and never overwrites one a human has already decided on, so repeat
+pushes of an already-`Accepted`/`Rejected` proposal are harmless no-ops.
+Per-proposal push failures are logged as warnings and never fail the run.
+
 `/etc/systemd/system/yaatal-ops.timer`:
 
 ```ini
