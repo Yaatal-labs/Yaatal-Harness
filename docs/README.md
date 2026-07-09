@@ -95,7 +95,11 @@ let response = router.chat(&ctx, &messages, ChatParams::default()).await?;
 
 ### yaatal-tools
 
-Tool execution runtime with built-in tools.
+Tool execution runtime with built-in tools. Only `file_read` and `session_note` build by
+default (`default = ["safe-tools"]`); the dangerous built-ins below are compiled out unless
+their Cargo feature is enabled, and `register_builtin` returns
+`Err(ToolError::PermissionDenied)` naming the required feature when one is requested
+without it.
 
 ```rust
 use yaatal_tools::{ToolExecutor, BuiltinTool};
@@ -103,9 +107,10 @@ use yaatal_core::{RequestContext, Tool, ToolResult};
 
 // Create executor with built-in tools
 let executor = ToolExecutor::new();
-executor.register_builtin(BuiltinTool::Shell).await;
-executor.register_builtin(BuiltinTool::FileRead).await;
-executor.register_builtin(BuiltinTool::Search).await;
+executor.register_builtin(BuiltinTool::FileRead).await?;
+// Requires the `local-shell` / `web-search` Cargo features (or `r-and-d-tools`):
+executor.register_builtin(BuiltinTool::Shell).await?;
+executor.register_builtin(BuiltinTool::Search).await?;
 
 // Execute a tool
 let ctx = RequestContext::new("req-1");
@@ -114,14 +119,15 @@ let result = executor.execute(&ctx, "shell", r#"{"command": "ls -la"}"#).await?;
 
 #### Built-in Tools
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `shell` | Execute shell commands | `command: string`, `cwd?: string` |
-| `file_read` | Read file contents | `path: string`, `limit?: number` |
-| `file_write` | Write to a file | `path: string`, `content: string` |
-| `git` | Execute git commands | `command: string`, `cwd?: string` |
-| `web_fetch` | Fetch URL content | `url: string`, `method?: string` |
-| `search` | Web search via DuckDuckGo | `query: string`, `num_results?: number` |
+| Tool | Description | Parameters | Cargo feature | Default? |
+|------|-------------|------------|----------------|----------|
+| `file_read` | Read file contents | `path: string`, `limit?: number` | `file-read` | yes |
+| `session_note` | Persist/read session notes | `operation: string`, `content?: string` | `session-note` | yes |
+| `shell` | Execute shell commands | `command: string`, `cwd?: string` | `local-shell` | no |
+| `file_write` | Write to a file | `path: string`, `content: string` | `file-write` | no |
+| `git` | Execute git commands | `command: string`, `cwd?: string` | `git` | no |
+| `web_fetch` | Fetch URL content | `url: string`, `method?: string` | `web-fetch` (needs `network`) | no |
+| `search` | Web search via DuckDuckGo | `query: string`, `num_results?: number` | `web-search` (needs `network`) | no |
 
 ### yaatal-search
 

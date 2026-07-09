@@ -86,7 +86,9 @@ with the tool allowlist itself as policy. See `docs/CONTROL-LOOP.md` and
 ## Integration Direction
 
 Engine depends on Harness through explicit Rust contracts; Harness does not depend on Engine.
-Near-term cleanup should narrow the residual runtime overlap by moving the `yaatal-api` stub and
-any dangerous local tools behind examples or feature flags, and by replacing session-owned tools
-with Engine-supplied adapters — all in service of making runtime custody, audit, and policy
-enforcement real rather than aspirational.
+`yaatal-tools`' dangerous local built-ins (shell, file write, git, web fetch, web search) are now
+gated behind Cargo features and off by default (`default = ["safe-tools"]` — file read and
+session notes only); see that crate's docs for the full feature table. Remaining near-term
+cleanup should narrow the residual runtime overlap by moving the `yaatal-api` stub behind
+examples, and by replacing session-owned tools with Engine-supplied adapters — all in service of
+making runtime custody, audit, and policy enforcement real rather than aspirational.
