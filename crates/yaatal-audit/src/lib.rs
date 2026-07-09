@@ -648,7 +648,10 @@ mod tests {
                 "engine:test-actor",
             )))
             .await;
-        executor.register_builtin(BuiltinTool::Shell).await;
+        executor
+            .register_builtin(BuiltinTool::Shell)
+            .await
+            .expect("local-shell feature enabled for this dev-dependency");
 
         let ctx = RequestContext::new(Uuid::new_v4().to_string());
         let result = executor

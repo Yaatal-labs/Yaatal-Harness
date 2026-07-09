@@ -14,4 +14,7 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
-yaatal-tools = { path = "../yaatal-tools" }
+# local-shell: this crate's test exercises ToolAuditObserver against a real dangerous
+# built-in (shell) to prove audit events are written; it is not part of the default
+# yaatal-tools surface (see that crate's compile-time dangerous-tool gates).
+yaatal-tools = { path = "../yaatal-tools", features = ["local-shell"] }
