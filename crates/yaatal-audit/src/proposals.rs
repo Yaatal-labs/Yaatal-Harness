@@ -54,7 +54,11 @@ pub enum ProposalChange {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ProposalStatus {
     Proposed,
-    Accepted,
+    /// Named to match the Engine review API's vocabulary (`Approved`, not
+    /// `Accepted`) so the two systems never need a status adapter. The serde
+    /// alias keeps pre-rename `proposals.jsonl` files readable.
+    #[serde(alias = "Accepted")]
+    Approved,
     Rejected,
 }
 

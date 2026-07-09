@@ -1,10 +1,12 @@
 # The Minimal Closed Loop
 
-Status: design proposal. Nothing described here is wired up. The only things that
-exist today are the crate contracts cited by name (`yaatal-core`, `yaatal-tools`,
-`yaatal-models`, `yaatal-policy`, `yaatal-evals`, `yaatal-observability`,
-`yaatal-memory`) and the traits/types they define. Everything with a "(new)" or
-"(proposed)" marker does not exist yet.
+Status: **implemented** (slices 1–5 built and tested; this document remains the
+design of record). The loop runs in `yaatal-audit` (events, stores, metrics,
+proposals), `yaatal-policy::tool_policy`, `yaatal-tools::audited_exec`,
+`yaatal-evals::ops_run`, and `yaatal-runner` — which also pushes proposals to
+the Engine's `/api/harness/proposals` review surface (see `docs/OPS-RUNNER.md`).
+"(new)"/"(proposed)" markers below are kept as written; read them as the design
+names for pieces that now exist under those crates.
 
 ## Goal
 

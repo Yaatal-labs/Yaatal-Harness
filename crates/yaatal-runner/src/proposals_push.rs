@@ -211,7 +211,7 @@ mod tests {
             tool: "git".to_string(),
             denial_count: 3,
         });
-        accepted.status = ProposalStatus::Accepted;
+        accepted.status = ProposalStatus::Approved;
         let rejected = {
             let mut p = proposed(ProposalChange::RaiseSpendCap { from: 1.0, to: 2.0 });
             p.status = ProposalStatus::Rejected;

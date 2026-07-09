@@ -47,20 +47,26 @@ The compiled workspace members are:
 `yaatal-api` is still present in the repository as a temporary integration stub, but it is
 intentionally excluded from the compiled workspace.
 
+**What exists now (built + tested; see `docs/CONTROL-LOOP.md` and `docs/OPS-RUNNER.md`):**
+
+- Persistent audit: `yaatal-audit` — `AuditEvent`, JSONL + in-memory stores, metrics rollups.
+- Custody: `yaatal-policy::tool_policy` (allowlist + per-run spend cap) and
+  `yaatal-tools::audited_exec` (policy-check-before-spawn, timeout kill, one audit event per
+  invocation).
+- Eval + proposals: `yaatal-evals::ops_run` scores each run; `yaatal-audit::proposals` generates
+  L1 `ConfigProposal`s over recent runs.
+- A first tenant: `yaatal-runner` (`yaatal-ops-runner`) executes a runbook through the custody
+  path daily, then syncs proposals to the Engine's review API (`/api/harness/proposals`) where a
+  human approves or rejects (`yaatal-proposals-push` is the on-demand CLI for the same push).
+
 **What does not exist yet — stated plainly:**
 
-- No runtime adapters. There is no Claw integration and no Hermes integration; nothing outside
-  this repo calls these contracts yet.
-- No persistent audit store. `yaatal-observability` provides tracing helpers, not a durable,
-  queryable audit log.
-- No metrics ingestion from a live Engine or Studio. `yaatal-evals` is a scaffold of offline
-  metrics, not a pipeline fed by production traffic.
-- No feedback→adjustment mechanism of any kind. The self-improvement loop described above has no
-  segments connected yet — this repo currently holds the contracts the loop will eventually run
-  through, not the loop itself.
-
-Treat every claim above as the actual state, not the goal: this is a compiling skeleton — contracts,
-mock providers, prototype tools, an in-memory store, policy implementations, and scaffolding.
+- No general runtime adapters. There is no Claw integration and no Hermes integration; the ops
+  runner is the only tenant of the custody path so far.
+- No model-driven planning. The runner executes a fixed runbook; nothing plans actions with an
+  LLM yet.
+- No auto-apply (L2). Approved proposals are applied by a human; the loop suggests, it does not
+  act on its own suggestions.
 
 ## Two runtimes, not one
 
