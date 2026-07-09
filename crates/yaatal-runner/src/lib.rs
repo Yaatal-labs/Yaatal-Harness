@@ -23,8 +23,6 @@
 //! nightly audit trail shape depend on which step failed. Ops consequences belong to the
 //! eval verdict (exit code), not to step short-circuiting.
 
-mod engine_sync;
-
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -37,6 +35,8 @@ use yaatal_core::RequestContext;
 use yaatal_evals::ops_run::{OpsRunEval, OpsRunReport};
 use yaatal_policy::tool_policy::ToolPolicyGate;
 use yaatal_tools::audited_exec::{AuditedExec, ExecError};
+
+pub mod proposals_push;
 
 /// How many runs must show a pattern before the proposal generator fires (see
 /// `yaatal_audit::proposals::ProposalRules::min_runs`). A const, not a runbook knob:
@@ -212,9 +212,9 @@ pub async fn execute(runbook: &Runbook) -> Result<RunSummary, RunnerError> {
         proposal_store.append(proposal)?;
     }
 
-    // Sync the whole proposal store to the Engine's review API, if configured — a
-    // no-op offline. See `engine_sync` module docs and `docs/OPS-RUNNER.md`.
-    engine_sync::sync_proposals_to_engine(&proposal_store).await;
+    // Sync pending proposals to the Engine's review API, if configured — a
+    // no-op offline. See `proposals_push` module docs and `docs/OPS-RUNNER.md`.
+    proposals_push::sync_after_run(runbook.audit_dir.join("proposals.jsonl")).await;
 
     Ok(RunSummary {
         run_id,
