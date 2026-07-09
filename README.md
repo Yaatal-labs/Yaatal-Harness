@@ -77,8 +77,10 @@ Yaatal has two runtimes and they are not the same thing:
 - **Yaatal Harness owns the agent runtime** — execution loops, tool custody, model access, policy
   gates.
 
-Engine depends on Harness, never the reverse. Engine supplies verified user/session/profile
-context; Harness supplies governed AI capability. Neither owns the other's concern: Harness does
+The two stay decoupled: capabilities cross the boundary as narrow HTTP/JSON contracts (e.g. the
+runner pushing proposals to Engine's `/api/harness/proposals`), never as crates compiled into the
+other runtime (see `ARCHITECTURE.md` § Promotion & boundary rules). Engine supplies verified
+user/session/profile context; Harness supplies governed AI capability. Neither owns the other's concern: Harness does
 not stand up HTTP/WebSocket entrypoints for end users, and Engine does not decide what an agent is
 allowed to call or spend.
 
@@ -91,7 +93,7 @@ with the tool allowlist itself as policy. See `docs/CONTROL-LOOP.md` and
 
 ## Integration Direction
 
-Engine depends on Harness through explicit Rust contracts; Harness does not depend on Engine.
+Engine and Harness integrate through explicit HTTP/JSON contracts; neither compiles the other in.
 `yaatal-tools`' dangerous local built-ins (shell, file write, git, web fetch, web search) are now
 gated behind Cargo features and off by default (`default = ["safe-tools"]` — file read and
 session notes only); see that crate's docs for the full feature table. Remaining near-term
