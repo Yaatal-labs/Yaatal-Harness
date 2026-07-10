@@ -2010,6 +2010,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
 
 [[package]]
+name = "yaatal-audit"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "uuid",
+ "yaatal-core",
+ "yaatal-tools",
+]
+
+[[package]]
 name = "yaatal-core"
 version = "0.1.0"
 dependencies = [
@@ -2027,8 +2042,12 @@ dependencies = [
 name = "yaatal-evals"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
+ "uuid",
+ "yaatal-audit",
  "yaatal-core",
 ]
 
@@ -2085,7 +2104,28 @@ dependencies = [
  "async-trait",
  "tokio",
  "tracing",
+ "uuid",
+ "yaatal-audit",
  "yaatal-core",
+]
+
+[[package]]
+name = "yaatal-runner"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+ "yaatal-audit",
+ "yaatal-core",
+ "yaatal-evals",
+ "yaatal-policy",
+ "yaatal-tools",
 ]
 
 [[package]]
@@ -2123,7 +2163,10 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "urlencoding",
+ "uuid",
+ "yaatal-audit",
  "yaatal-core",
+ "yaatal-policy",
 ]
 
 [[package]]

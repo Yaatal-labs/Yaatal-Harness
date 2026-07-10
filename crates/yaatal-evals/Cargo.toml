@@ -5,5 +5,11 @@ edition = "2021"
 
 [dependencies]
 yaatal-core = { path = "../yaatal-core" }
+yaatal-audit = { path = "../yaatal-audit" }
 tokio = { workspace = true }
 tracing = { workspace = true }
+serde = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }

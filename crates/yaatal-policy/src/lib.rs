@@ -8,8 +8,11 @@
 //! ## Modules
 //!
 //! - [`speaker_aware`]: Speaker-aware access control policy
+//! - [`tool_policy`]: CONTROL-LOOP slice 3 — the `ToolPolicy` tool-call gate (allowlist +
+//!   per-run spend cap)
 
 pub mod speaker_aware;
+pub mod tool_policy;
 
 use async_trait::async_trait;
 use tracing::info;

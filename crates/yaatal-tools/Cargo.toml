@@ -3,8 +3,28 @@ name = "yaatal-tools"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["safe-tools"]
+# Read-only / local-state built-ins with no network or mutation surface.
+safe-tools = ["file-read", "session-note"]
+file-read = []
+session-note = []
+# Dangerous built-ins: local code exec, filesystem mutation, network egress.
+# Off by default — enable only in trusted R&D contexts (see crate docs).
+local-shell = []
+file-write = []
+git = []
+network = ["dep:reqwest", "dep:urlencoding"]
+web-fetch = ["network"]
+web-search = ["network"]
+r-and-d-tools = ["local-shell", "file-write", "git", "web-fetch", "web-search"]
+all-builtin-tools = ["safe-tools", "r-and-d-tools"]
+
 [dependencies]
 yaatal-core = { path = "../yaatal-core" }
+yaatal-audit = { path = "../yaatal-audit" }
+yaatal-policy = { path = "../yaatal-policy" }
+uuid = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -12,6 +32,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing-subscriber = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, optional = true }
 chrono = { workspace = true }
-urlencoding = "2"
+urlencoding = { version = "2", optional = true }

@@ -520,6 +520,22 @@ impl IntentHandler for ExplainIntentHandler {
 // TESTS
 // =============================================================================
 
+/// Mock handler for testing.
+#[cfg(test)]
+struct MockHandler;
+
+#[cfg(test)]
+#[async_trait::async_trait]
+impl IntentHandler for MockHandler {
+    async fn handle(
+        &self,
+        _intent: &Intent,
+        _ctx: &RequestContext,
+    ) -> Result<ToolResult, ToolError> {
+        Ok(ToolResult::success("mock result"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -568,21 +584,5 @@ mod tests {
         let actions = router.registered_actions();
         assert!(actions.contains(&"search".to_string()));
         assert!(actions.contains(&"research".to_string()));
-    }
-}
-
-/// Mock handler for testing.
-#[cfg(test)]
-struct MockHandler;
-
-#[cfg(test)]
-#[async_trait::async_trait]
-impl IntentHandler for MockHandler {
-    async fn handle(
-        &self,
-        _intent: &Intent,
-        _ctx: &RequestContext,
-    ) -> Result<ToolResult, ToolError> {
-        Ok(ToolResult::success("mock result"))
     }
 }
