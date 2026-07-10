@@ -35,6 +35,7 @@ This is the use case that turns the control plane from "admirable" into
 | **Facebook Live comments** | ✅ official Graph *Live Video* SSE `live_comments` | ✅ comment/reply on Page live videos | **App Review** + your app must produce the RTMPS stream (first-party) | **Build second** — attainable *because* OBS→Yaatal produces the stream |
 | **Instagram DM** | ✅ official Messaging API webhooks | ✅ within 24h window | Business/Creator acct + **business verification + App Review** (weeks) | **Third** — same Meta rails as WA/FB; approval-gated |
 | **TikTok Live comments** | ❌ **no official API/webhook** (official webhooks cover auth/video events only) | virtual-camera bridge only (already in Studio) | — | **Park** — only unofficial 3rd-party Webcast libs exist (ToS-gray, ban risk); no compliant path today |
+| **Telegram Bot API** | ✅ official webhooks (`setWebhook`, authed via `X-Telegram-Bot-Api-Secret-Token`) | ✅ official `sendMessage` — free, no service window, no templates | a bot token from BotFather; **no verification, no review** | **Built 2026-07-10** — Engine `/webhooks/telegram` + outbound service + Studio source; the zero-gatekeeper channel, live before Meta answers |
 
 Sources checked: Meta WhatsApp Cloud API pricing + webhooks docs; Meta Graph
 Live Video API `live_comments` + FAQ (RTMPS/first-party requirement); Meta
