@@ -99,15 +99,15 @@ After=network-online.target
 [Service]
 Type=oneshot
 User=yaatal
-Environment=YAATAL_ENGINE_URL=http://<magicdns-name>:5150
-# Prefer an EnvironmentFile with 0600 perms for the token, not an inline value:
+# Credentials (not a static token — see §3 "Token freshness") in 0600 file:
 EnvironmentFile=/etc/yaatal/ops.env
-ExecStart=/opt/yaatal/yaatal-ops-runner /etc/yaatal/daily-ops.json
+ExecStart=/opt/yaatal/run-ops.sh
 # One JSON summary to stdout → the journal; exit 0 = eval passed, 1 = failed.
 StandardOutput=journal
 ```
 
-`/etc/yaatal/ops.env` (mode 0600, owner yaatal): `YAATAL_TOKEN=…`
+`/etc/yaatal/ops.env` (mode 0600, owner yaatal): `YAATAL_OPS_EMAIL=…` and
+`YAATAL_OPS_PASSWORD=…` — the §3 wrapper mints a fresh `YAATAL_TOKEN` per run.
 
 The runner also syncs `proposals.jsonl` to the Engine's review API (`POST
 /api/harness/proposals`) at the end of every run, so pending L1 proposals show
@@ -151,7 +151,7 @@ system of record. Push the local JSONL file after a run:
 
 ```bash
 YAATAL_ENGINE_URL=http://<magicdns-name>:5150 \
-YAATAL_TOKEN="$(cat /etc/yaatal/ops.env | sed -n 's/^YAATAL_TOKEN=//p')" \
+YAATAL_TOKEN="$(yaatal auth login --email "$YAATAL_OPS_EMAIL" --password "$YAATAL_OPS_PASSWORD" | jq -r .token)" \
 /opt/yaatal/yaatal-proposals-push /var/lib/yaatal/ops-audit/proposals.jsonl
 ```
 
