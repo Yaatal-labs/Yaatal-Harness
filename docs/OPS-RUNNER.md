@@ -42,12 +42,28 @@ sudo ufw deny 5150/tcp
 ```
 
 Then the runner's environment points at the Engine by its MagicDNS name (or
-tailnet IP). Get a token once via the CLI:
+tailnet IP).
+
+**Token freshness — do NOT bake a static token into the env file.** Engine
+JWTs expire after `JWT_EXPIRATION_SECONDS` (default **3 days**), so a
+one-time token in `/etc/yaatal/ops.env` makes the timer start failing
+silently on day four. Instead, store the ops account *credentials* in the
+0600 env file (`YAATAL_OPS_EMAIL`, `YAATAL_OPS_PASSWORD`) and mint a fresh
+token at the top of every run via the service wrapper:
 
 ```bash
+#!/usr/bin/env bash
+# /opt/yaatal/run-ops.sh — systemd ExecStart wrapper: fresh token per run
+set -euo pipefail
 export YAATAL_ENGINE_URL="http://<magicdns-name>:5150"   # e.g. http://yaatal-engine.tailnet-xxxx.ts.net:5150
-export YAATAL_TOKEN="$(YAATAL_ENGINE_URL=$YAATAL_ENGINE_URL yaatal auth login --email ops@yaatal --password '****' | jq -r .token)"
+YAATAL_TOKEN="$(yaatal auth login --email "$YAATAL_OPS_EMAIL" --password "$YAATAL_OPS_PASSWORD" | jq -r .token)"
+export YAATAL_TOKEN
+exec /opt/yaatal/yaatal-ops-runner /etc/yaatal/daily-ops.json
 ```
+
+Every run then carries a token valid for days, not one that quietly aged
+out. (A login is one extra request per run; the audit trail shows the ops
+account as `actor` either way.)
 
 Register a dedicated **ops service account** on the Engine for this (not a
 human's login) — its JWT is the runner's identity and shows up as the audit
