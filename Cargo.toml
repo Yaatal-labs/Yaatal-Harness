@@ -17,6 +17,7 @@ members = [
     "crates/yaatal-memory",
     "crates/yaatal-audit",
     "crates/yaatal-runner",
+    "crates/yaatal-edge-turn",
 ]
 
 [workspace.package]
