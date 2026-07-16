@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
+use std::time::Duration;
 
 use crate::EngineContext;
 
@@ -31,7 +33,10 @@ impl HttpEngineContextSource {
             return Err("YAATAL_TOKEN is required".to_string());
         }
         Ok(Self {
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(10))
+                .build()
+                .map_err(|error| error.to_string())?,
             base_url,
             token,
         })
@@ -95,13 +100,38 @@ pub struct MinimindHttpBackend {
 
 impl MinimindHttpBackend {
     pub fn new(base_url: impl Into<String>) -> Result<Self, String> {
-        let base_url = base_url.into().trim_end_matches('/').to_string();
+        let base_url = base_url.into();
         if base_url.is_empty() {
             return Err("MINIMIND_URL is required".to_string());
         }
+
+        let parsed = reqwest::Url::parse(&base_url)
+            .map_err(|error| format!("invalid MINIMIND_URL: {error}"))?;
+        if !matches!(parsed.scheme(), "http" | "https") {
+            return Err("MINIMIND_URL must use http or https".to_string());
+        }
+        let host = parsed
+            .host_str()
+            .ok_or_else(|| "MINIMIND_URL must include a host".to_string())?;
+        let ip_host = host
+            .strip_prefix('[')
+            .and_then(|value| value.strip_suffix(']'))
+            .unwrap_or(host);
+        let is_loopback = host.eq_ignore_ascii_case("localhost")
+            || ip_host
+                .parse::<IpAddr>()
+                .map(|address| address.is_loopback())
+                .unwrap_or(false);
+        if !is_loopback {
+            return Err("MINIMIND_URL must target a loopback host".to_string());
+        }
+
         Ok(Self {
-            client: reqwest::Client::new(),
-            base_url,
+            client: reqwest::Client::builder()
+                .timeout(Duration::from_secs(180))
+                .build()
+                .map_err(|error| error.to_string())?,
+            base_url: base_url.trim_end_matches('/').to_string(),
         })
     }
 }

@@ -3,7 +3,9 @@ mod common;
 use std::sync::Arc;
 
 use uuid::Uuid;
-use yaatal_edge_turn::{Decision, EdgeTurnRequest, ToolName, CONTRACT_VERSION};
+use yaatal_edge_turn::{
+    Decision, EdgeTurnRequest, MinimindHttpBackend, ToolName, CONTRACT_VERSION,
+};
 
 use common::{request, runner, DenyAll};
 
@@ -65,4 +67,24 @@ fn proposal_tool_names_are_stable() {
         ToolName::UpdatePriceOverlay.as_str(),
         "studio.update_price_overlay"
     );
+}
+
+#[test]
+fn minimind_backend_accepts_only_loopback_hosts() {
+    for url in [
+        "http://localhost:8008",
+        "http://127.0.0.1:8008/",
+        "http://[::1]:8008",
+    ] {
+        assert!(MinimindHttpBackend::new(url).is_ok(), "url={url}");
+    }
+
+    for url in [
+        "https://example.com",
+        "http://192.168.1.20:8008",
+        "http://localhost.example.com:8008",
+        "file:///tmp/minimind.sock",
+    ] {
+        assert!(MinimindHttpBackend::new(url).is_err(), "url={url}");
+    }
 }
