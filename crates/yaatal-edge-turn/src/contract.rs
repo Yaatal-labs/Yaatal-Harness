@@ -5,6 +5,9 @@ use crate::EdgeTurnError;
 
 pub const CONTRACT_VERSION: &str = "edge-turn.v1";
 pub const MAX_PRICE_FCFA: i64 = 10_000_000;
+/// One live seller utterance, not a monologue — caps prompt size at the trust
+/// boundary so an oversized transcript can't stuff the prompt or stall a turn.
+pub const MAX_TRANSCRIPT_CHARS: usize = 2_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -49,6 +52,11 @@ impl EdgeTurnRequest {
             return Err(EdgeTurnError::InvalidRequest(
                 "transcript.text must not be empty".to_string(),
             ));
+        }
+        if self.transcript.text.chars().count() > MAX_TRANSCRIPT_CHARS {
+            return Err(EdgeTurnError::InvalidRequest(format!(
+                "transcript.text exceeds {MAX_TRANSCRIPT_CHARS} characters"
+            )));
         }
         if !valid_confidence(self.transcript.confidence) {
             return Err(EdgeTurnError::InvalidRequest(

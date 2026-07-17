@@ -16,7 +16,7 @@ pub use backends::{
 pub use contract::{
     Decision, EdgeTurnRequest, EdgeTurnResponse, EdgeTurnSource, EngineContext, EngineProduct,
     EngineSession, ModelBackendKind, ModelProposal, ToolName, Transcript, CONTRACT_VERSION,
-    MAX_PRICE_FCFA,
+    MAX_PRICE_FCFA, MAX_TRANSCRIPT_CHARS,
 };
 pub use runner::EdgeTurnRunner;
 

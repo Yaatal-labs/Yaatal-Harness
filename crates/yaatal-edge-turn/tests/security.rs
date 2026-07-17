@@ -5,6 +5,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use yaatal_edge_turn::{
     Decision, EdgeTurnRequest, MinimindHttpBackend, ToolName, CONTRACT_VERSION,
+    MAX_TRANSCRIPT_CHARS,
 };
 
 use common::{request, runner, DenyAll};
@@ -59,6 +60,17 @@ fn request_rejects_unknown_fields_and_invalid_confidence() {
     let mut invalid = request();
     invalid.transcript.confidence = f64::NAN;
     assert!(invalid.validate().is_err());
+}
+
+#[test]
+fn request_rejects_oversized_transcript() {
+    let mut oversized = request();
+    oversized.transcript.text = "x".repeat(MAX_TRANSCRIPT_CHARS + 1);
+    assert!(oversized.validate().is_err());
+
+    let mut at_limit = request();
+    at_limit.transcript.text = "x".repeat(MAX_TRANSCRIPT_CHARS);
+    assert!(at_limit.validate().is_ok());
 }
 
 #[test]

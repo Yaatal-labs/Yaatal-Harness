@@ -128,7 +128,10 @@ impl MinimindHttpBackend {
 
         Ok(Self {
             client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(180))
+                // A live selling turn is dead after a few seconds — fail fast
+                // into the model_backend_error deny path instead of holding
+                // the stream (Studio's client gives up at 25s).
+                .timeout(Duration::from_secs(15))
                 .build()
                 .map_err(|error| error.to_string())?,
             base_url: base_url.trim_end_matches('/').to_string(),
