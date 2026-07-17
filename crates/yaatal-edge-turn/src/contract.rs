@@ -97,6 +97,9 @@ pub struct EngineProduct {
     pub merchant_id: String,
     pub name: String,
     pub description: Option<String>,
+    /// Whole FCFA despite the name — XOF has no subunit, and the Engine
+    /// renders this field as FCFA with no /100 (views/catalog.rs::format_price).
+    /// Do NOT divide by 100 when mapping to price_fcfa.
     pub price_cents: i32,
     pub price_display: String,
     pub discount_price_cents: Option<i32>,
@@ -225,6 +228,7 @@ pub(crate) fn build_prompt(
             serde_json::json!({
                 "id": product.id,
                 "name": product.name,
+                // price_cents holds whole FCFA (see EngineProduct) — 1:1 map.
                 "price_fcfa": product.price_cents,
                 "stock": product.stock,
                 "stock_status": product.stock_status,
