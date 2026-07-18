@@ -5,6 +5,43 @@ use std::time::Duration;
 
 use crate::EngineContext;
 
+const MAX_AUDIT_IDENTIFIER_LEN: usize = 96;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProposalResult {
+    pub output: String,
+    pub runner_model: Option<String>,
+    pub runner_checkpoint: Option<String>,
+}
+
+impl ProposalResult {
+    pub fn output_only(output: impl Into<String>) -> Self {
+        Self {
+            output: output.into(),
+            runner_model: None,
+            runner_checkpoint: None,
+        }
+    }
+
+    pub(crate) fn audit_identity(&self) -> Option<String> {
+        let model = self.runner_model.as_deref()?;
+        let checkpoint = self.runner_checkpoint.as_deref()?;
+        if valid_audit_identifier(model) && valid_audit_identifier(checkpoint) {
+            Some(format!("{model}@{checkpoint}"))
+        } else {
+            None
+        }
+    }
+}
+
+fn valid_audit_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_AUDIT_IDENTIFIER_LEN
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+}
+
 #[async_trait]
 pub trait ContextSource: Send + Sync {
     async fn current(&self) -> Result<EngineContext, String>;
@@ -13,7 +50,7 @@ pub trait ContextSource: Send + Sync {
 #[async_trait]
 pub trait ProposalBackend: Send + Sync {
     fn name(&self) -> &str;
-    async fn propose(&self, prompt: &str) -> Result<String, String>;
+    async fn propose(&self, prompt: &str) -> Result<ProposalResult, String>;
 }
 
 pub struct HttpEngineContextSource {
@@ -88,8 +125,8 @@ impl ProposalBackend for MockProposalBackend {
         "mock"
     }
 
-    async fn propose(&self, _prompt: &str) -> Result<String, String> {
-        Ok(self.output.clone())
+    async fn propose(&self, _prompt: &str) -> Result<ProposalResult, String> {
+        Ok(ProposalResult::output_only(self.output.clone()))
     }
 }
 
@@ -158,10 +195,10 @@ struct MinimindResponse {
 #[async_trait]
 impl ProposalBackend for MinimindHttpBackend {
     fn name(&self) -> &str {
-        "minimind-o-stage3-wolof"
+        "minimind-o"
     }
 
-    async fn propose(&self, prompt: &str) -> Result<String, String> {
+    async fn propose(&self, prompt: &str) -> Result<ProposalResult, String> {
         let response = self
             .client
             .post(format!("{}/v1/propose", self.base_url))
@@ -177,7 +214,10 @@ impl ProposalBackend for MinimindHttpBackend {
             .json::<MinimindResponse>()
             .await
             .map_err(|error| error.to_string())?;
-        let _metadata = (response.model, response.checkpoint);
-        Ok(response.output)
+        Ok(ProposalResult {
+            output: response.output,
+            runner_model: response.model,
+            runner_checkpoint: response.checkpoint,
+        })
     }
 }

@@ -51,22 +51,28 @@ impl EdgeTurnRunner {
         let started = Instant::now();
         let model_result = self.backend.propose(&prompt).await;
         let latency_ms = started.elapsed().as_millis() as u64;
+        let model_action_name = match &model_result {
+            Ok(result) => result
+                .audit_identity()
+                .unwrap_or_else(|| self.backend.name().to_string()),
+            Err(_) => self.backend.name().to_string(),
+        };
         let (raw_output, model_ok) = match &model_result {
-            Ok(output) => (output.as_str(), true),
+            Ok(result) => (result.output.as_str(), true),
             Err(error) => (error.as_str(), false),
         };
         let mut model_event = AuditEventBuilder::new(
             request.run_id,
             &self.actor,
             ActionKind::ModelCall,
-            self.backend.name(),
+            model_action_name,
         )
         .finish(&prompt, raw_output, model_ok);
         model_event.latency_ms = latency_ms;
         self.store.append(model_event).await?;
 
         let raw_output = match model_result {
-            Ok(output) => output,
+            Ok(result) => result.output,
             Err(_) => {
                 return self
                     .finish(

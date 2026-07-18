@@ -11,7 +11,7 @@ mod runner;
 
 pub use backends::{
     ContextSource, HttpEngineContextSource, MinimindHttpBackend, MockProposalBackend,
-    ProposalBackend,
+    ProposalBackend, ProposalResult,
 };
 pub use contract::{
     Decision, EdgeTurnRequest, EdgeTurnResponse, EdgeTurnSource, EngineContext, EngineProduct,

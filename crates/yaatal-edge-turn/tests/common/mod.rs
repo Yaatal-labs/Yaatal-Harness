@@ -6,7 +6,8 @@ use yaatal_audit::{AuditStore, MemoryAuditStore, PolicyVerdict};
 use yaatal_core::RequestContext;
 use yaatal_edge_turn::{
     ContextSource, EdgeTurnRequest, EdgeTurnRunner, EdgeTurnSource, EngineContext, EngineProduct,
-    EngineSession, MockProposalBackend, ModelBackendKind, Transcript, CONTRACT_VERSION,
+    EngineSession, MockProposalBackend, ModelBackendKind, ProposalBackend, Transcript,
+    CONTRACT_VERSION,
 };
 use yaatal_policy::tool_policy::{ToolPolicy, ToolPolicyGate};
 
@@ -85,6 +86,13 @@ pub fn runner(
     output: &str,
     policy_override: Option<Arc<dyn ToolPolicy>>,
 ) -> (EdgeTurnRunner, Arc<MemoryAuditStore>) {
+    runner_with_backend(Arc::new(MockProposalBackend::new(output)), policy_override)
+}
+
+pub fn runner_with_backend(
+    backend: Arc<dyn ProposalBackend>,
+    policy_override: Option<Arc<dyn ToolPolicy>>,
+) -> (EdgeTurnRunner, Arc<MemoryAuditStore>) {
     let memory = Arc::new(MemoryAuditStore::new());
     let store: Arc<dyn AuditStore> = memory.clone();
     let policy: Arc<dyn ToolPolicy> = policy_override.unwrap_or_else(|| {
@@ -101,7 +109,7 @@ pub fn runner(
     (
         EdgeTurnRunner::new(
             Arc::new(StaticContext),
-            Arc::new(MockProposalBackend::new(output)),
+            backend,
             store,
             policy,
             "studio:test",

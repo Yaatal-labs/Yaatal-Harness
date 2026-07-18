@@ -1,3 +1,4 @@
+use std::fs::OpenOptions;
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -32,6 +33,11 @@ async fn run() -> Result<yaatal_edge_turn::EdgeTurnResponse, String> {
     let request: EdgeTurnRequest =
         serde_json::from_str(&input).map_err(|error| format!("invalid request JSON: {error}"))?;
 
+    let audit_path = preflight_audit_path(
+        &std::env::var("YAATAL_EDGE_AUDIT_PATH")
+            .map_err(|_| "YAATAL_EDGE_AUDIT_PATH is required".to_string())?,
+    )?;
+
     let engine_url = std::env::var("YAATAL_ENGINE_URL")
         .map_err(|_| "YAATAL_ENGINE_URL is required".to_string())?;
     let token =
@@ -47,17 +53,6 @@ async fn run() -> Result<yaatal_edge_turn::EdgeTurnResponse, String> {
         }
     };
 
-    let audit_path = PathBuf::from(
-        std::env::var("YAATAL_EDGE_AUDIT_PATH")
-            .unwrap_or_else(|_| "data/edge-turn-audit.jsonl".to_string()),
-    );
-    if let Some(parent) = audit_path
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-    {
-        std::fs::create_dir_all(parent)
-            .map_err(|error| format!("cannot create audit directory: {error}"))?;
-    }
     let store: Arc<dyn AuditStore> = Arc::new(JsonlAuditStore::new(audit_path));
     let policy: Arc<dyn ToolPolicy> = Arc::new(ToolPolicyGate::new(
         [
@@ -81,7 +76,61 @@ async fn run() -> Result<yaatal_edge_turn::EdgeTurnResponse, String> {
     .map_err(|error| error.to_string())
 }
 
+fn preflight_audit_path(raw_path: &str) -> Result<PathBuf, String> {
+    if raw_path.trim().is_empty() {
+        return Err("YAATAL_EDGE_AUDIT_PATH must be nonempty".to_string());
+    }
+    let audit_path = PathBuf::from(raw_path);
+    if let Some(parent) = audit_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+    {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("cannot create audit directory: {error}"))?;
+    }
+    OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&audit_path)
+        .map_err(|error| format!("cannot open audit file for append: {error}"))?;
+    Ok(audit_path)
+}
+
 fn fail(message: String) -> ExitCode {
     eprintln!("{}", serde_json::json!({ "error": message }));
     ExitCode::from(2)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::preflight_audit_path;
+
+    fn temp_path(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("yaatal-edge-turn-{label}-{}", uuid::Uuid::new_v4()))
+    }
+
+    use std::path::PathBuf;
+
+    #[test]
+    fn audit_preflight_creates_missing_parent_and_file() {
+        let root = temp_path("preflight-create");
+        let path = root.join("nested").join("audit.jsonl");
+
+        let checked = preflight_audit_path(path.to_str().expect("UTF-8 temp path"))
+            .expect("preflight succeeds");
+
+        assert_eq!(checked, path);
+        assert!(path.is_file());
+        std::fs::remove_dir_all(root).expect("temp tree removed");
+    }
+
+    #[test]
+    fn audit_preflight_rejects_empty_and_directory_targets() {
+        assert!(preflight_audit_path("  ").is_err());
+
+        let directory = temp_path("preflight-directory");
+        std::fs::create_dir_all(&directory).expect("directory target created");
+        assert!(preflight_audit_path(directory.to_str().expect("UTF-8 temp path")).is_err());
+        std::fs::remove_dir_all(directory).expect("temp directory removed");
+    }
 }
