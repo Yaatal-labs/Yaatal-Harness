@@ -2039,6 +2039,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "yaatal-edge-turn"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "uuid",
+ "yaatal-audit",
+ "yaatal-core",
+ "yaatal-policy",
+]
+
+[[package]]
 name = "yaatal-evals"
 version = "0.1.0"
 dependencies = [
