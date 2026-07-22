@@ -6,26 +6,40 @@ use std::sync::Arc;
 
 use yaatal_audit::{AuditStore, JsonlAuditStore};
 use yaatal_edge_turn::{
-    EdgeTurnRequest, EdgeTurnRunner, HttpEngineContextSource, MinimindHttpBackend,
-    MockProposalBackend, ModelBackendKind, ProposalBackend,
+    EdgeTurnRequest, EdgeTurnResponse, EdgeTurnRunner, HttpEngineContextSource, MinimindHttpBackend,
+    MockProposalBackend, ModelBackendKind, ProposalBackend, ServerConfig,
 };
 use yaatal_policy::tool_policy::{ToolPolicy, ToolPolicyGate};
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    match run().await {
-        Ok(response) => match serde_json::to_string(&response) {
-            Ok(json) => {
-                println!("{json}");
-                ExitCode::SUCCESS
-            }
-            Err(error) => fail(error.to_string()),
-        },
-        Err(error) => fail(error),
+    // --cli flag: run in stdin/stdout CLI mode (original behaviour).
+    // No flag (default): run HTTP server.
+    let args: Vec<String> = std::env::args().collect();
+    let cli_mode = args.iter().any(|arg| arg == "--cli");
+
+    if cli_mode {
+        match run_cli().await {
+            Ok(response) => match serde_json::to_string(&response) {
+                Ok(json) => {
+                    println!("{json}");
+                    ExitCode::SUCCESS
+                }
+                Err(error) => fail(error.to_string()),
+            },
+            Err(error) => fail(error),
+        }
+    } else {
+        let config = ServerConfig::from_env();
+        match yaatal_edge_turn::serve(config).await {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => fail(error),
+        }
     }
 }
 
-async fn run() -> Result<yaatal_edge_turn::EdgeTurnResponse, String> {
+/// CLI mode: read EdgeTurnRequest from stdin, run runner, print response.
+async fn run_cli() -> Result<EdgeTurnResponse, String> {
     let mut input = String::new();
     std::io::stdin()
         .read_to_string(&mut input)
@@ -40,8 +54,7 @@ async fn run() -> Result<yaatal_edge_turn::EdgeTurnResponse, String> {
 
     let engine_url = std::env::var("YAATAL_ENGINE_URL")
         .map_err(|_| "YAATAL_ENGINE_URL is required".to_string())?;
-    let token =
-        std::env::var("YAATAL_TOKEN").map_err(|_| "YAATAL_TOKEN is required".to_string())?;
+    let token = std::env::var("YAATAL_TOKEN").map_err(|_| "YAATAL_TOKEN is required".to_string())?;
     let context_source = Arc::new(HttpEngineContextSource::new(engine_url, token)?);
 
     let backend: Arc<dyn ProposalBackend> = match request.model_backend {
