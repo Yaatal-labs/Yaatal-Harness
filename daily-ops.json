@@ -1,0 +1,13 @@
+{
+  "run_name": "daily-ops",
+  "timeout_secs": 30,
+  "spend_cap": null,
+  "p95_latency_ms": 30000,
+  "audit_dir": "/var/lib/yaatal/ops-audit",
+  "proposal_window_runs": 5,
+  "steps": [
+    { "name": "products-snapshot", "program": "yaatal", "args": ["products", "list", "--limit", "5"] },
+    { "name": "orders-snapshot",   "program": "yaatal", "args": ["orders", "list"] },
+    { "name": "deliveries-open",   "program": "yaatal", "args": ["deliveries", "list"] }
+  ]
+}

@@ -8,6 +8,7 @@
 mod backends;
 mod contract;
 mod runner;
+mod server;
 
 pub use backends::{
     ContextSource, HttpEngineContextSource, MinimindHttpBackend, MockProposalBackend,
@@ -19,6 +20,7 @@ pub use contract::{
     MAX_PRICE_FCFA, MAX_TRANSCRIPT_CHARS,
 };
 pub use runner::EdgeTurnRunner;
+pub use server::{serve, ServerConfig, ServerState, DEFAULT_EDGE_TURN_PORT, DEFAULT_ENGINE_API_URL};
 
 use yaatal_audit::AuditError;
 
