@@ -21,7 +21,12 @@
 //! handed to it by a caller — this crate never decides Allow/Deny itself.
 
 pub mod metrics;
+#[cfg(feature = "postgres")]
+mod pg;
 pub mod proposals;
+
+#[cfg(feature = "postgres")]
+pub use pg::PgAuditStore;
 
 use std::collections::hash_map::DefaultHasher;
 use std::fs::{File, OpenOptions};
@@ -210,6 +215,9 @@ pub enum AuditError {
     Io(#[from] std::io::Error),
     #[error("audit event (de)serialization error: {0}")]
     Serde(#[from] serde_json::Error),
+    #[cfg(feature = "postgres")]
+    #[error("audit store database error: {0}")]
+    Db(#[from] sqlx::Error),
 }
 
 /// Append-only store for `AuditEvent`s: append, and query by run/time-range/count.
@@ -283,8 +291,9 @@ impl AuditStore for MemoryAuditStore {
 /// Append-only JSON-lines `AuditStore` (one `AuditEvent` per line). Durable across
 /// process restarts; reads stream the file rather than holding it all in a field.
 ///
-/// ponytail: JSONL-on-disk is the L0 ceiling. Upgrade path: Postgres (Engine already
-/// hosts one) once query volume or concurrent-writer needs outgrow a flat file.
+/// ponytail: JSONL-on-disk is the L0 ceiling. Upgrade path: `PgAuditStore` (behind the
+/// `postgres` feature — reuses the Postgres the Engine already hosts) once query volume or
+/// concurrent-writer needs outgrow a flat file.
 pub struct JsonlAuditStore {
     path: PathBuf,
     write_lock: Mutex<()>,

@@ -11,6 +11,20 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+# Postgres audit store (the documented JSONL upgrade). Optional: JSONL/in-memory users
+# pull none of this. Runtime queries only (no `query!` macro) so no DATABASE_URL is
+# needed at build time.
+sqlx = { version = "0.8", optional = true, default-features = false, features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
+] }
+
+[features]
+# `postgres` activates `PgAuditStore`. Off by default — keeps the L0 default (JSONL) lean.
+postgres = ["dep:sqlx"]
 
 [dev-dependencies]
 tokio = { workspace = true }
