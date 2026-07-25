@@ -25,3 +25,8 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 reqwest = { workspace = true }
 tracing = { workspace = true }
+
+[features]
+# Build with `--features postgres` to let the runner use PgAuditStore when
+# AUDIT_PG_URL / DATABASE_URL is set (else it stays on the JSONL default).
+postgres = ["yaatal-audit/postgres"]

@@ -24,7 +24,7 @@
 //! eval verdict (exit code), not to step short-circuiting.
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -149,13 +149,37 @@ pub struct RunSummary {
     pub proposals_emitted: usize,
 }
 
+/// Select the audit store: Postgres when the `postgres` feature is built *and* a
+/// connection URL is set (`AUDIT_PG_URL`, else `DATABASE_URL`), otherwise the JSONL file
+/// in `audit_dir`. Same `AuditStore` contract either way — the rest of the run is
+/// store-agnostic — so this is the whole cutover. Env-gated: the default deploy stays on
+/// JSONL until Postgres is deliberately wired.
+async fn build_audit_store(audit_dir: &Path) -> Result<Arc<dyn AuditStore>, RunnerError> {
+    #[cfg(feature = "postgres")]
+    if let Some(url) = audit_pg_url() {
+        let store = yaatal_audit::PgAuditStore::connect(&url).await?;
+        tracing::info!("audit store: postgres");
+        return Ok(Arc::new(store));
+    }
+    let path = audit_dir.join("audit.jsonl");
+    tracing::info!("audit store: jsonl at {}", path.display());
+    Ok(Arc::new(JsonlAuditStore::new(path)))
+}
+
+/// First non-empty of `AUDIT_PG_URL`, then `DATABASE_URL`.
+#[cfg(feature = "postgres")]
+fn audit_pg_url() -> Option<String> {
+    ["AUDIT_PG_URL", "DATABASE_URL"]
+        .into_iter()
+        .find_map(|k| std::env::var(k).ok().filter(|v| !v.trim().is_empty()))
+}
+
 /// Execute a runbook end to end: steps through `AuditedExec` (policy + audit), then
 /// metrics, eval, and the proposal pass. Child processes inherit this process's env, so
 /// `YAATAL_ENGINE_URL` / `YAATAL_TOKEN` flow through to the `yaatal` CLI untouched.
 pub async fn execute(runbook: &Runbook) -> Result<RunSummary, RunnerError> {
     std::fs::create_dir_all(&runbook.audit_dir)?;
-    let store: Arc<JsonlAuditStore> =
-        Arc::new(JsonlAuditStore::new(runbook.audit_dir.join("audit.jsonl")));
+    let store: Arc<dyn AuditStore> = build_audit_store(&runbook.audit_dir).await?;
     let proposal_store = JsonlProposalStore::new(runbook.audit_dir.join("proposals.jsonl"));
 
     // The runbook IS the authorization: the allowlist is exactly the set of programs
@@ -164,14 +188,14 @@ pub async fn execute(runbook: &Runbook) -> Result<RunSummary, RunnerError> {
     let gate = Arc::new(ToolPolicyGate::new(
         allowlist,
         runbook.spend_cap,
-        Arc::clone(&store) as Arc<dyn AuditStore>,
+        Arc::clone(&store),
     ));
 
     let run_id = Uuid::new_v4();
     let actor = format!("harness:ops-runner:{}", runbook.run_name);
     let exec = AuditedExec::new(
         gate,
-        Arc::clone(&store) as Arc<dyn AuditStore>,
+        Arc::clone(&store),
         &actor,
         Duration::from_secs(runbook.timeout_secs),
     );
