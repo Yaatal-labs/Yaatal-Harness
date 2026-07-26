@@ -187,6 +187,52 @@ the custody we already have — do not fork ZeroClaw.** Reasons:
    each adapter implements it. **Mirror ZeroClaw's adapter *pattern*** (read its
    whatsapp channel for the shape) — don't vendor its whole runtime.
 
+### Runtime option: Pi — the minimal executor ZeroClaw isn't (added 2026-07-26)
+
+The runtime analysis above only ever weighed **ZeroClaw**, and rejected it for a
+single, correct reason: forking a 30-channel monolith to use 4 carries 26 channels
+you'll never run (rung-1/2 Ponytail failure). That objection is specific to
+ZeroClaw's *shape*, not to runtimes in general — so it left a gap: **a minimal,
+extensible runtime was never considered.** [Pi](https://pi.dev/)
+(earendil-works, **MIT**) is exactly that, and it's the agent stack that already
+powers **OpenClaw** — the project `CLI-FIRST-TOOLS.md` and `POLICY-DISTRIBUTION.md`
+already cite.
+
+Pi inverts ZeroClaw's profile:
+
+| | ZeroClaw | Pi |
+|---|---|---|
+| Core | 30+ channels, SOP, providers, memory bundled | **minimal 4-tool core** (Read/Write/Edit/Bash) |
+| Growth | carve a monolith down | **add only the extension/skill you need** (TS extensions · skills · prompt templates · Pi packages over npm/git) |
+| Providers | its own | `pi-ai` — unified across 20+ (Anthropic/OpenAI/Google/xAI/DeepSeek/Mistral/Groq), BYOK **or** subscription login |
+| Runtime layer | agent loop + SOP | `pi-agent-core` — tool-calling + state (the executor) |
+| Ponytail rung | fails 1/2 (bigger surface) | rung 5 (mature permissive dep), grow-not-carve |
+
+**This flips the "no runtime" default when a trigger fires** — but not the *timing*.
+The YAGNI verdict below still holds: adopt a runtime only when one of the triggers
+lands. Pi changes the answer to **"which runtime,"** not **"do we need one yet."**
+
+- **Best-fit trigger:** #2 (the ops runner needs to drive tools/channels beyond
+  the `yaatal` CLI). `yaatal-runner` is a fixed runbook today; `pi-agent-core` is
+  a far lighter substrate for a real multi-step SOP loop than a ZeroClaw fork.
+- **It sits *inside* Harness custody, it does not replace it.** Pi fills the empty
+  runtime box in the diagram above (`Pi → YAATAL-HARNESS → Engine`); Harness still
+  owns `ToolPolicyGate` + `AuditEvent` + `AuditedExec` + the L0/L1/L2 gate. Pi's
+  Bash tool is precisely the dangerous-exec our custody layer already wraps — a
+  clean seam. Its `pi-ai` provider layer mirrors the Engine's 5-tier cascade router
+  shape; one must defer to the other, never run two routers.
+- **Sovereignty:** MIT + BYOK + self-host + self-extensible = the same **fork-and-pin**
+  posture already blessed for ZeroClaw, but a smaller, cleaner thing to own.
+- **Same maturity caution as ZeroClaw:** young runtime — audit the subset you adopt
+  (Bash exec especially), pin a known-good commit, pull upstream selectively. Do
+  not live-depend on it in a payments-adjacent stack.
+
+**Decision (recorded, trigger-gated):** if/when trigger #2 (ops runner beyond the
+CLI) or #1 (sovereign Wolof-voice path) fires, adopt **Pi's `pi-agent-core` as the
+executor inside Harness custody** — not a ZeroClaw fork — because Pi answers the
+exact Ponytail objection that killed ZeroClaw. Until a trigger fires: unchanged —
+thin per-channel adapters behind existing custody.
+
 Fork ZeroClaw only if you ever want *many* channels **and** its runtime pieces
 (agent loop/SOP/providers/memory) — which you don't, because Harness + Engine
 already are that. So: **mirror the pattern, own the adapters.**
