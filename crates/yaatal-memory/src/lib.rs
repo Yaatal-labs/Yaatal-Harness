@@ -17,8 +17,10 @@
 //! ## Example
 //!
 //! ```rust
-//! use yaatal_memory::{InMemoryStore, MemoryType};
-//! use yaatal_core::MemoryEntry;
+//! use yaatal_memory::InMemoryStore;
+//! // `store`/`recall` are trait methods, so `MemoryStore` has to be in scope to call
+//! // them — and both it and `MemoryEntry` live in `yaatal-core`, not here.
+//! use yaatal_core::{MemoryEntry, MemoryStore};
 //!
 //! #[tokio::main]
 //! async fn main() {

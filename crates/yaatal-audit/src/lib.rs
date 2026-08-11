@@ -23,9 +23,7 @@
 pub mod metrics;
 pub mod proposals;
 
-use std::collections::hash_map::DefaultHasher;
 use std::fs::{File, OpenOptions};
-use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -44,24 +42,41 @@ use yaatal_core::{Observer, ObserverError, PipelineEvent};
 /// invariant (audit records must not become a second copy of user data).
 ///
 /// These digests are **correlation identifiers only**: good enough to tell "same input
-/// again" from "different input" within one audit trail, not a cryptographic commitment.
-/// They are not collision-resistant, and — because this uses `std::hash::Hasher`'s
-/// default algorithm (currently SipHash-1-3) rather than a documented, version-stable
-/// algorithm — not guaranteed stable across Rust toolchain versions either. Do not treat
-/// the `stdhash:` prefix as a promise the same input hashes the same way after a rustc
-/// upgrade.
+/// again" from "different input", not a cryptographic commitment. They are not
+/// collision-resistant and not preimage-resistant.
 ///
-/// ponytail: `sha2` is not in this workspace's dependency tree (checked `Cargo.lock`), so
-/// rather than add a new dependency for an L0 scaffold this uses the standard library's
-/// `Hasher`. It still satisfies "never leak the raw payload" — a length+prefix digest
-/// would not. Upgrade path: swap this function's body for `sha2::Sha256` if a workspace
-/// crate ever already depends on it, or once real collision-resistance / cross-version
-/// stability is needed (e.g. content-addressed dedup across untrusted input, or digests
-/// compared across a Rust upgrade).
+/// **Why not `DefaultHasher` any more.** This used `std::hash::Hasher`'s default
+/// algorithm, whose own docs say the output is not guaranteed stable across Rust
+/// releases. The comment here named the condition that would force a change — "digests
+/// compared across a Rust upgrade" — and that condition has since been met without
+/// anyone noticing: `proposals::detect` compares `timeout_digest(...)`, computed now,
+/// against `output_digest` values read back from the **persisted** JSONL store, possibly
+/// written by an older toolchain. A rustc bump would therefore have stopped timeout
+/// detection silently — the self-improvement loop would simply stop proposing timeout
+/// fixes, with no error anywhere. A digest that feeds a comparison against durable state
+/// has to be defined by this crate, not by the standard library's current mood.
+///
+/// FNV-1a (64-bit), spelled out below: fully specified, no dependency, identical output
+/// on every toolchain and platform forever.
+///
+/// **One-time break, deliberately.** `fnv1a:` digests do not match the old `stdhash:`
+/// ones, so audit rows written before this change no longer correlate with rows written
+/// after. That is the same break a rustc upgrade would have caused — taken once, on
+/// purpose, visibly in the prefix, instead of at random later.
+///
+/// ponytail: known ceiling is that FNV-1a is not a cryptographic hash, so a digest of
+/// low-entropy content (a phone number, a short utterance) is recoverable by brute force
+/// — "digest-only" bounds accidental disclosure, it is not a privacy guarantee against
+/// someone holding the audit log. Upgrade path when that matters: an HMAC with a
+/// deployment secret, which needs key management this scaffold does not have yet.
 pub fn digest(payload: &str) -> String {
-    let mut hasher = DefaultHasher::new();
-    payload.hash(&mut hasher);
-    format!("stdhash:{:016x}", hasher.finish())
+    // FNV-1a, 64-bit: offset basis 0xcbf29ce484222325, prime 0x100000001b3.
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in payload.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
+    }
+    format!("fnv1a:{hash:016x}")
 }
 
 /// Convert a `u64` millisecond duration to the `i64` `chrono::Duration::milliseconds`
@@ -532,6 +547,31 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    /// Pinned FNV-1a vectors. The point of this test is not that FNV is correct — it is
+    /// that `digest` produces the *same bytes on every toolchain, forever*, because
+    /// `proposals::detect` compares a freshly computed digest against digests read back
+    /// from a JSONL file written by an earlier process. Its predecessor used
+    /// `DefaultHasher`, whose output std explicitly does not promise to keep stable, so a
+    /// rustc upgrade would have broken timeout detection in silence. If this test ever
+    /// fails, digests have drifted and every persisted audit trail stopped correlating —
+    /// do not "fix" it by updating the expected values without migrating the stores.
+    #[test]
+    fn digest_is_stable_across_toolchains() {
+        assert_eq!(digest(""), "fnv1a:cbf29ce484222325");
+        assert_eq!(digest("a"), "fnv1a:af63dc4c8601ec8c");
+        assert_eq!(digest("foobar"), "fnv1a:85944171f73967e8");
+    }
+
+    /// The invariant the whole crate rests on: an audit row is never a second copy of
+    /// user data. A digest must not contain, or be trivially derived from, its payload.
+    #[test]
+    fn digest_does_not_echo_its_payload() {
+        let secret = "+221770000000";
+        let d = digest(secret);
+        assert!(!d.contains(secret));
+        assert_ne!(d, digest("+221770000001"));
+    }
 
     fn temp_jsonl_path() -> PathBuf {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
