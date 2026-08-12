@@ -4,6 +4,10 @@ Yaatal-Harness is the **AI control plane** of Yaatal — runtime custody, audit,
 and the self-improvement loop. Read `README.md` and `ARCHITECTURE.md` first; design docs live in
 `docs/` (`CONTROL-LOOP.md`, `CLI-FIRST-TOOLS.md`, `POLICY-DISTRIBUTION.md`).
 
+Picking up the Pi runtime work? Start at `docs/PI-BRIDGE-RUNBOOK.md` — current
+state, the invariants that must not be broken, and the next concrete task. Its
+design rationale is `docs/PI-RUNTIME-INTEGRATION.md`.
+
 Gate before any PR: `cargo check --workspace --all-targets` (the workspace must keep compiling;
 `crates/yaatal-api` is a stub excluded from the workspace — leave it out).
 
