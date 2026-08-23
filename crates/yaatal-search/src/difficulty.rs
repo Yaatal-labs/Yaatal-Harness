@@ -201,7 +201,7 @@ impl DifficultyClassifier {
         }
 
         // Clamp score between 0.0 and 1.0
-        score.max(0.0).min(1.0)
+        score.clamp(0.0, 1.0)
     }
 
     /// Count multi-intent indicators in query.

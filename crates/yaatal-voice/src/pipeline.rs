@@ -86,21 +86,20 @@ impl VoicePipeline {
         debug!(request_id = %ctx.request_id, audio_len = audio.len(), "voice_pipeline_start");
 
         // 1. Check wake word (if required)
-        if self.config.require_wake_word {
-            if !self
+        if self.config.require_wake_word
+            && !self
                 .stt
                 .detect_wake_word(audio)
                 .await
                 .map_err(|e| HarnessError::External(e.to_string()))?
-            {
-                return Ok(VoicePipelineResult {
-                    text: None,
-                    audio: None,
-                    intent: None,
-                    success: false,
-                    error: Some("Wake word not detected".to_string()),
-                });
-            }
+        {
+            return Ok(VoicePipelineResult {
+                text: None,
+                audio: None,
+                intent: None,
+                success: false,
+                error: Some("Wake word not detected".to_string()),
+            });
         }
 
         // 2. Speech-to-text

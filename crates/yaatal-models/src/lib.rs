@@ -853,62 +853,6 @@ impl MockProvider {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn openai_tool_result_requires_tool_call_id() {
-        let err = serialize_openai_message(&Message::tool_result("search", "done"))
-            .expect_err("tool result without tool_call_id should fail");
-
-        match err {
-            LlmError::Provider(message) => assert!(message.contains("tool_call_id")),
-            other => panic!("unexpected error: {:?}", other),
-        }
-    }
-
-    #[test]
-    fn openai_assistant_tool_calls_preserve_argument_string() {
-        let message = Message::assistant_with_tools(
-            "",
-            vec![ToolCall {
-                id: Some("call_123".to_string()),
-                name: "search".to_string(),
-                arguments: r#"{"query":"rust"}"#.to_string(),
-            }],
-        );
-
-        let serialized =
-            serialize_openai_message(&message).expect("assistant tool calls serialize");
-
-        assert_eq!(
-            serialized["tool_calls"][0]["function"]["arguments"].as_str(),
-            Some(r#"{"query":"rust"}"#)
-        );
-        assert_eq!(serialized["tool_calls"][0]["id"].as_str(), Some("call_123"));
-    }
-
-    #[test]
-    fn openai_tool_call_parser_keeps_arguments_raw() {
-        let parsed = parse_openai_tool_calls(&serde_json::json!([
-            {
-                "id": "call_123",
-                "type": "function",
-                "function": {
-                    "name": "search",
-                    "arguments": "{\"query\":\"rust\"}"
-                }
-            }
-        ]));
-
-        assert_eq!(parsed.len(), 1);
-        assert_eq!(parsed[0].id.as_deref(), Some("call_123"));
-        assert_eq!(parsed[0].name, "search");
-        assert_eq!(parsed[0].arguments, r#"{"query":"rust"}"#);
-    }
-}
-
 impl Default for MockProvider {
     fn default() -> Self {
         Self::new("Mock response")
@@ -980,5 +924,61 @@ impl LlmProvider for MockProvider {
 
     async fn health_check(&self) -> bool {
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn openai_tool_result_requires_tool_call_id() {
+        let err = serialize_openai_message(&Message::tool_result("search", "done"))
+            .expect_err("tool result without tool_call_id should fail");
+
+        match err {
+            LlmError::Provider(message) => assert!(message.contains("tool_call_id")),
+            other => panic!("unexpected error: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn openai_assistant_tool_calls_preserve_argument_string() {
+        let message = Message::assistant_with_tools(
+            "",
+            vec![ToolCall {
+                id: Some("call_123".to_string()),
+                name: "search".to_string(),
+                arguments: r#"{"query":"rust"}"#.to_string(),
+            }],
+        );
+
+        let serialized =
+            serialize_openai_message(&message).expect("assistant tool calls serialize");
+
+        assert_eq!(
+            serialized["tool_calls"][0]["function"]["arguments"].as_str(),
+            Some(r#"{"query":"rust"}"#)
+        );
+        assert_eq!(serialized["tool_calls"][0]["id"].as_str(), Some("call_123"));
+    }
+
+    #[test]
+    fn openai_tool_call_parser_keeps_arguments_raw() {
+        let parsed = parse_openai_tool_calls(&serde_json::json!([
+            {
+                "id": "call_123",
+                "type": "function",
+                "function": {
+                    "name": "search",
+                    "arguments": "{\"query\":\"rust\"}"
+                }
+            }
+        ]));
+
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].id.as_deref(), Some("call_123"));
+        assert_eq!(parsed[0].name, "search");
+        assert_eq!(parsed[0].arguments, r#"{"query":"rust"}"#);
     }
 }

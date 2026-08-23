@@ -30,8 +30,8 @@ use yaatal_audit::{AuditStore, JsonlAuditStore};
 use yaatal_policy::tool_policy::{ToolPolicy, ToolPolicyGate};
 
 use crate::{
-    ContextSource, EdgeTurnError, EdgeTurnRequest, EdgeTurnResponse, EdgeTurnRunner,
-    EngineContext, MockProposalBackend, MinimindHttpBackend, ProposalBackend, CONTRACT_VERSION,
+    ContextSource, EdgeTurnError, EdgeTurnRequest, EdgeTurnResponse, EdgeTurnRunner, EngineContext,
+    MinimindHttpBackend, MockProposalBackend, ProposalBackend, CONTRACT_VERSION,
 };
 
 /// Default port for the HTTP server.
@@ -169,10 +169,9 @@ impl ServerState {
     /// Pick the runner for the given model backend.
     fn runner_for(&self, backend: crate::ModelBackendKind) -> &Arc<EdgeTurnRunner> {
         match backend {
-            crate::ModelBackendKind::Minimind => self
-                .minimind_runner
-                .as_ref()
-                .unwrap_or(&self.mock_runner),
+            crate::ModelBackendKind::Minimind => {
+                self.minimind_runner.as_ref().unwrap_or(&self.mock_runner)
+            }
             crate::ModelBackendKind::Mock => &self.mock_runner,
         }
     }
@@ -247,10 +246,7 @@ async fn edge_turn_handler(
         }
         Err(EdgeTurnError::InvalidRequest(msg)) => {
             warn!(error = %msg, "invalid request");
-            Err((
-                StatusCode::BAD_REQUEST,
-                Json(ErrorResponse { error: msg }),
-            ))
+            Err((StatusCode::BAD_REQUEST, Json(ErrorResponse { error: msg })))
         }
         Err(error) => {
             let message = error.to_string();

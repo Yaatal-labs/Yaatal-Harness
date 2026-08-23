@@ -6,8 +6,8 @@ use std::sync::Arc;
 
 use yaatal_audit::{AuditStore, JsonlAuditStore};
 use yaatal_edge_turn::{
-    EdgeTurnRequest, EdgeTurnResponse, EdgeTurnRunner, HttpEngineContextSource, MinimindHttpBackend,
-    MockProposalBackend, ModelBackendKind, ProposalBackend, ServerConfig,
+    EdgeTurnRequest, EdgeTurnResponse, EdgeTurnRunner, HttpEngineContextSource,
+    MinimindHttpBackend, MockProposalBackend, ModelBackendKind, ProposalBackend, ServerConfig,
 };
 use yaatal_policy::tool_policy::{ToolPolicy, ToolPolicyGate};
 
@@ -54,7 +54,8 @@ async fn run_cli() -> Result<EdgeTurnResponse, String> {
 
     let engine_url = std::env::var("YAATAL_ENGINE_URL")
         .map_err(|_| "YAATAL_ENGINE_URL is required".to_string())?;
-    let token = std::env::var("YAATAL_TOKEN").map_err(|_| "YAATAL_TOKEN is required".to_string())?;
+    let token =
+        std::env::var("YAATAL_TOKEN").map_err(|_| "YAATAL_TOKEN is required".to_string())?;
     let context_source = Arc::new(HttpEngineContextSource::new(engine_url, token)?);
 
     let backend: Arc<dyn ProposalBackend> = match request.model_backend {
