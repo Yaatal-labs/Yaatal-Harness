@@ -1,0 +1,452 @@
+diff --git a/crates/yaatal-api/src/controllers/voice.rs b/crates/yaatal-api/src/controllers/voice.rs
+index 76c446a..3ba7629 100644
+--- a/crates/yaatal-api/src/controllers/voice.rs
++++ b/crates/yaatal-api/src/controllers/voice.rs
+@@ -23,7 +23,47 @@ pub struct WsTokenParam {
+     pub token: String,
+ }
+ 
++/// Operator approval for sending recorded audio out of the sovereign zone to
++/// HuggingFace's hosted inference API.
++///
++/// Recorded speech is Sovereign data and this endpoint's only backend is a
++/// third party. Nothing here can classify audio — `classify_data_class` reads
++/// text — so the endpoint refuses instead of guessing. Mirrors
++/// `BYO_SOVEREIGN_APPROVED` in the AI cascade, including its strictness: only
++/// ever true when the operator says so in as many letters. Any other value —
++/// "1", "yes", a typo — is not approval.
++///
++/// ponytail: a refusal, not a classifier. Ceiling — approval is per
++/// deployment, not per turn, so once it is set every caller's audio may leave.
++/// Upgrade path: V3-V5 of the voice plan replace this route with the on-device
++/// speech-core pipeline and delete the cloud branch, at which point this
++/// constant and its env var go with it.
++pub const CLOUD_TRANSCRIPTION_APPROVAL_ENV: &str = "VOICE_AUDIO_EXPORT_TO_HUGGINGFACE_APPROVED";
++
++fn cloud_transcription_approved() -> bool {
++    std::env::var(CLOUD_TRANSCRIPTION_APPROVAL_ENV)
++        .ok()
++        .filter(|value| !value.is_empty())
++        .is_some_and(|value| value.trim().eq_ignore_ascii_case("true"))
++}
++
+ pub async fn transcribe(State(_ctx): State<AppContext>, body: Bytes) -> Result<Response> {
++    if !cloud_transcription_approved() {
++        tracing::warn!(
++            approval = CLOUD_TRANSCRIPTION_APPROVAL_ENV,
++            bytes = body.len(),
++            "refused cloud transcription: audio export is not approved"
++        );
++        return Ok((
++            StatusCode::SERVICE_UNAVAILABLE,
++            format!(
++                "transcription would send recorded audio to HuggingFace; \
++                 set {CLOUD_TRANSCRIPTION_APPROVAL_ENV}=true to approve that export"
++            ),
++        )
++            .into_response());
++    }
++
+     let result = TranscriptionRouter::transcribe(&body, false)
+         .await
+         .map_err(|e| loco_rs::Error::string(&e.to_string()))?;
+diff --git a/crates/yaatal-api/src/services/voice_session.rs b/crates/yaatal-api/src/services/voice_session.rs
+index a833ea6..23111c4 100644
+--- a/crates/yaatal-api/src/services/voice_session.rs
++++ b/crates/yaatal-api/src/services/voice_session.rs
+@@ -2,6 +2,9 @@ use axum::extract::ws::{Message, WebSocket};
+ use futures_util::{SinkExt, StreamExt};
+ use loco_rs::prelude::*;
+ use std::time::Instant;
++use yaatal_core::ai::network::{DefaultNetworkGate, NetworkCondition, NetworkGate};
++use yaatal_core::ai::sensitivity::classify_data_class;
++use yaatal_core::policy::Sensitivity;
+ use yaatal_search::contracts::SearchRequest;
+ use yaatal_voice::{
+     client::{VoiceClientError, VoiceServiceConnection},
+@@ -108,9 +111,27 @@ impl TurnState {
+         self.route_decided_this_turn = true;
+     }
+ 
+-    fn routing_signals(&self) -> VoiceTurnSignals<'_> {
++    /// Signals for one turn's route decision.
++    ///
++    /// The two that decide *where the turn may run* are read from the Engine's
++    /// existing sources — [`classify_data_class`], the one sovereignty
++    /// classifier, and the injected [`NetworkGate`]. They were constants
++    /// (`false` / `true`) until 2026-08-23, which made both force-edge paths in
++    /// `voice_routing` unreachable: a buyer's phone number could ride the cloud
++    /// lane, and a dead link was reported as a live one.
++    ///
++    /// ponytail: the five signals below stay inert — `asr_confidence`,
++    /// `intent_confidence`, `entity_count`, `tool_candidate_count` and
++    /// `duplex_requested` have no producer in this session yet, so the router
++    /// sees defaults for all of them. Ceiling: routing *quality* (a hard turn
++    /// is not escalated to cloud on confidence), never routing *safety* — the
++    /// two force-edge paths above outrank every one of these. Upgrade path:
++    /// the voice service already frames per-turn metadata, so they land here
++    /// when `VoiceServerMessage` carries confidences and an intent parse.
++    fn routing_signals(&self, network: &dyn NetworkGate) -> VoiceTurnSignals<'_> {
++        let transcript = self.text_buffer.trim();
+         VoiceTurnSignals {
+-            transcript: self.text_buffer.trim(),
++            transcript,
+             duration: self.turn_started_at.map(|started_at| started_at.elapsed()),
+             audio_chunk_count: self.audio_chunk_count,
+             asr_confidence: None,
+@@ -118,8 +139,8 @@ impl TurnState {
+             entity_count: 0,
+             tool_candidate_count: 0,
+             duplex_requested: false,
+-            network_available: true,
+-            privacy_sensitive: false,
++            network_available: network.condition() != NetworkCondition::Offline,
++            privacy_sensitive: classify_data_class(transcript) == Sensitivity::Sovereign,
+         }
+     }
+ 
+@@ -142,6 +163,12 @@ pub async fn handle_voice_session(
+         .unwrap_or_else(|_| "ws://127.0.0.1:8082/session".to_string());
+     let search_client = SearchServiceClient::from_env();
+     let mut routing = VoiceRoutingSession::new(VoiceRoutingConfig::from_env());
++    // ponytail: the Engine's only implementation, and it reports 4G+ always,
++    // so today this reads the same as the constant it replaces. What changes
++    // is where the answer comes from: one seam the whole Engine shares.
++    // Ceiling — no real probe exists yet. Upgrade path: a probing `NetworkGate`
++    // (E7/E8 mobile connectivity callbacks) is picked up here for free.
++    let network = DefaultNetworkGate;
+ 
+     tracing::info!(user_pid = %user_pid, profile_id = %profile_id, "opening engine voice session");
+ 
+@@ -193,7 +220,7 @@ pub async fn handle_voice_session(
+                 if let VoiceServerMessage::Subtitle { text, final_chunk } = &server_message {
+                     state.record_subtitle(text);
+                     if *final_chunk {
+-                        maybe_route_turn(&mut client_sink, &mut routing, &mut state).await?;
++                        maybe_route_turn(&mut client_sink, &mut routing, &mut state, &network).await?;
+                         maybe_ground_turn(&search_client, &mut upstream, &mut client_sink, &mut state)
+                             .await?;
+                     }
+@@ -203,7 +230,7 @@ pub async fn handle_voice_session(
+                 send_server_message(&mut client_sink, &server_message).await?;
+ 
+                 if should_reset_turn {
+-                    maybe_route_turn(&mut client_sink, &mut routing, &mut state).await?;
++                    maybe_route_turn(&mut client_sink, &mut routing, &mut state, &network).await?;
+                     maybe_ground_turn(&search_client, &mut upstream, &mut client_sink, &mut state)
+                         .await?;
+                     state.reset_turn();
+@@ -219,12 +246,13 @@ async fn maybe_route_turn(
+     client_sink: &mut futures_util::stream::SplitSink<WebSocket, Message>,
+     routing: &mut VoiceRoutingSession,
+     state: &mut TurnState,
++    network: &dyn NetworkGate,
+ ) -> Result<(), VoiceSessionError> {
+     if state.route_decided_this_turn || state.text_buffer.trim().is_empty() {
+         return Ok(());
+     }
+ 
+-    let decision = routing.decide(&state.routing_signals());
++    let decision = routing.decide(&state.routing_signals(network));
+     state.mark_route_decided();
+ 
+     tracing::info!(
+@@ -335,7 +363,72 @@ async fn send_server_message(
+ #[allow(clippy::unwrap_used, clippy::expect_used)]
+ mod tests {
+     use super::{format_route_debug, TurnState};
+-    use crate::services::voice_routing::{VoiceRouteDecision, VoiceRouteLane, VoiceRoutingState};
++    use crate::services::voice_routing::{
++        VoiceRouteDecision, VoiceRouteLane, VoiceRoutingConfig, VoiceRoutingSession,
++        VoiceRoutingState,
++    };
++    use yaatal_core::ai::network::{DefaultNetworkGate, NetworkCondition, NetworkGate};
++
++    struct FixedGate(NetworkCondition);
++    impl NetworkGate for FixedGate {
++        fn condition(&self) -> NetworkCondition {
++            self.0
++        }
++    }
++
++    /// Drive a turn the way the session does — transcript in, signals out,
++    /// router decides — because the defect this covers was not in either
++    /// component but in the wire between them: the two force-edge paths were
++    /// fed constants, so they never fired in production while their own unit
++    /// tests stayed green.
++    fn decide(transcript: &str, gate: &dyn NetworkGate) -> super::VoiceRouteDecision {
++        let mut state = TurnState::default();
++        state.record_audio_chunk();
++        state.record_subtitle(transcript);
++        VoiceRoutingSession::new(VoiceRoutingConfig::default()).decide(&state.routing_signals(gate))
++    }
++
++    #[test]
++    fn a_transcript_carrying_an_identifier_routes_edge() {
++        // Repairs would force cloud on their own; a phone number outranks them.
++        let decision = decide(
++            "no, that's not it. i said call me on 77 123 45 67",
++            &DefaultNetworkGate,
++        );
++
++        assert_eq!(decision.lane, VoiceRouteLane::Edge);
++        assert!(
++            decision.reasons.iter().any(|r| r == "privacy_sensitive"),
++            "reasons: {:?}",
++            decision.reasons
++        );
++    }
++
++    #[test]
++    fn an_ordinary_transcript_is_not_privacy_sensitive() {
++        let decision = decide("find white fabric", &DefaultNetworkGate);
++
++        assert!(
++            !decision.reasons.iter().any(|r| r == "privacy_sensitive"),
++            "reasons: {:?}",
++            decision.reasons
++        );
++    }
++
++    #[test]
++    fn an_offline_network_routes_edge() {
++        let decision = decide(
++            "no, that's not it. i said find white fabric",
++            &FixedGate(NetworkCondition::Offline),
++        );
++
++        assert_eq!(decision.lane, VoiceRouteLane::Edge);
++        assert!(
++            decision.reasons.iter().any(|r| r == "network_unavailable"),
++            "reasons: {:?}",
++            decision.reasons
++        );
++    }
+ 
+     #[test]
+     fn turn_state_only_searches_for_search_like_text() {
+diff --git a/crates/yaatal-api/tests/requests/endpoint_inventory.rs b/crates/yaatal-api/tests/requests/endpoint_inventory.rs
+index aa501dd..504b7ab 100644
+--- a/crates/yaatal-api/tests/requests/endpoint_inventory.rs
++++ b/crates/yaatal-api/tests/requests/endpoint_inventory.rs
+@@ -675,7 +675,10 @@ async fn bobo_order_routes_require_auth_and_report_sqlite_boundary() {
+ #[serial]
+ async fn ai_voice_and_livekit_routes_have_testable_runtime_boundaries() {
+     let livekit_guard = EnvGuard::clear(&["LIVEKIT_API_KEY", "LIVEKIT_API_SECRET", "LIVEKIT_URL"]);
+-    let hf_guard = EnvGuard::clear(&["HF_API_TOKEN"]);
++    let hf_guard = EnvGuard::clear(&[
++        "HF_API_TOKEN",
++        yaatal_api::controllers::voice::CLOUD_TRANSCRIPTION_APPROVAL_ENV,
++    ]);
+ 
+     request::<App, _, _>(|request, ctx| async move {
+         let unauthenticated_ai = request
+@@ -686,11 +689,14 @@ async fn ai_voice_and_livekit_routes_have_testable_runtime_boundaries() {
+             .await;
+         assert_eq!(unauthenticated_ai.status_code(), 401);
+ 
++        // 503, not 500: with no operator approval on record the endpoint
++        // refuses to export audio before any credential or network is
++        // involved. `requests::voice` proves nothing is sent.
+         let transcribe = request
+             .post("/api/voice/transcribe")
+             .bytes(Bytes::from_static(b"fake-audio"))
+             .await;
+-        assert_eq!(transcribe.status_code(), 500);
++        assert_eq!(transcribe.status_code(), 503, "{}", transcribe.text());
+ 
+         let session_without_ws_upgrade = request.get("/api/voice/session?token=invalid").await;
+         assert_eq!(session_without_ws_upgrade.status_code(), 400);
+diff --git a/crates/yaatal-api/tests/requests/mod.rs b/crates/yaatal-api/tests/requests/mod.rs
+index eda76dd..f386f97 100644
+--- a/crates/yaatal-api/tests/requests/mod.rs
++++ b/crates/yaatal-api/tests/requests/mod.rs
+@@ -20,4 +20,5 @@ mod search;
+ mod sms_webhook;
+ mod social_events;
+ mod telegram_webhook;
++mod voice;
+ mod whatsapp_webhook;
+diff --git a/crates/yaatal-api/tests/requests/voice.rs b/crates/yaatal-api/tests/requests/voice.rs
+new file mode 100644
+index 0000000..1d1fea8
+--- /dev/null
++++ b/crates/yaatal-api/tests/requests/voice.rs
+@@ -0,0 +1,147 @@
++//! End-to-end cover for `/api/voice/transcribe`.
++//!
++//! Recorded speech is Sovereign data and this endpoint's only backend is a
++//! third party (HuggingFace hosted inference). The test that matters is not
++//! "does it return an error" but "did the audio stay home" — so a mock stands
++//! in for HuggingFace and every case asserts what it did or did not receive.
++
++use loco_rs::testing::prelude::*;
++use serial_test::serial;
++use wiremock::matchers::{method, path};
++use wiremock::{Mock, MockServer, ResponseTemplate};
++use yaatal_api::app::App;
++use yaatal_api::controllers::voice::CLOUD_TRANSCRIPTION_APPROVAL_ENV;
++
++const HF_MODEL_PATH: &str = "/models/openai/whisper-large-v3";
++
++/// Saves the env keys a test touches and puts them back on drop, so the shared
++/// test process does not inherit them.
++struct EnvGuard(Vec<(&'static str, Option<String>)>);
++
++impl EnvGuard {
++    fn capture(keys: &[&'static str]) -> Self {
++        Self(
++            keys.iter()
++                .map(|key| (*key, std::env::var(key).ok()))
++                .collect(),
++        )
++    }
++}
++
++impl Drop for EnvGuard {
++    fn drop(&mut self) {
++        for (key, previous) in &self.0 {
++            match previous {
++                Some(value) => std::env::set_var(key, value),
++                None => std::env::remove_var(key),
++            }
++        }
++    }
++}
++
++/// A stand-in for the HuggingFace inference API that answers the whisper model
++/// path. Reachable — which is the point: if the endpoint sends anything, this
++/// records it.
++async fn huggingface_stub() -> MockServer {
++    let server = MockServer::start().await;
++    Mock::given(method("POST"))
++        .and(path(HF_MODEL_PATH))
++        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
++            "text": "naka nga def"
++        })))
++        .mount(&server)
++        .await;
++    server
++}
++
++fn point_transcription_at(server: &MockServer) {
++    std::env::set_var("HF_INFERENCE_BASE_URL", server.uri());
++    std::env::set_var("HF_API_TOKEN", "test-token");
++}
++
++#[tokio::test]
++#[serial]
++async fn transcribe_refuses_and_sends_no_audio_without_operator_approval() {
++    let _guard = EnvGuard::capture(&[
++        CLOUD_TRANSCRIPTION_APPROVAL_ENV,
++        "HF_INFERENCE_BASE_URL",
++        "HF_API_TOKEN",
++    ]);
++    let server = huggingface_stub().await;
++    point_transcription_at(&server);
++    std::env::remove_var(CLOUD_TRANSCRIPTION_APPROVAL_ENV);
++
++    request::<App, _, _>(|request, _ctx| async move {
++        let response = request
++            .post("/api/voice/transcribe")
++            .text("pretend-this-is-a-wav")
++            .await;
++
++        assert_eq!(response.status_code(), 503, "body: {}", response.text());
++        assert!(
++            response.text().contains(CLOUD_TRANSCRIPTION_APPROVAL_ENV),
++            "the refusal must name the approval it wants: {}",
++            response.text()
++        );
++
++        // The assertion a status code cannot make: nothing left the Engine.
++        assert!(
++            server
++                .received_requests()
++                .await
++                .unwrap_or_default()
++                .is_empty(),
++            "audio reached the third party despite the refusal"
++        );
++    })
++    .await;
++}
++
++#[tokio::test]
++#[serial]
++async fn transcribe_reaches_huggingface_only_on_a_literal_true() {
++    let _guard = EnvGuard::capture(&[
++        CLOUD_TRANSCRIPTION_APPROVAL_ENV,
++        "HF_INFERENCE_BASE_URL",
++        "HF_API_TOKEN",
++    ]);
++    let server = huggingface_stub().await;
++    point_transcription_at(&server);
++
++    request::<App, _, _>(|request, _ctx| async move {
++        // Approval spelled out: the export happens. That proves the stub is
++        // reachable, so the refusal in the test above was the gate and not an
++        // unreachable URL.
++        std::env::set_var(CLOUD_TRANSCRIPTION_APPROVAL_ENV, "true");
++        let response = request
++            .post("/api/voice/transcribe")
++            .text("pretend-this-is-a-wav")
++            .await;
++        assert_eq!(response.status_code(), 200, "body: {}", response.text());
++        assert!(response.text().contains("naka nga def"));
++        assert_eq!(
++            server.received_requests().await.unwrap_or_default().len(),
++            1
++        );
++
++        // Near-misses are not approval.
++        for not_approval in ["yes", "1", "ture"] {
++            std::env::set_var(CLOUD_TRANSCRIPTION_APPROVAL_ENV, not_approval);
++            let response = request
++                .post("/api/voice/transcribe")
++                .text("pretend-this-is-a-wav")
++                .await;
++            assert_eq!(
++                response.status_code(),
++                503,
++                "{not_approval:?} must not read as approval"
++            );
++            assert_eq!(
++                server.received_requests().await.unwrap_or_default().len(),
++                1,
++                "{not_approval:?} let audio out"
++            );
++        }
++    })
++    .await;
++}
+diff --git a/crates/yaatal-voice/src/transcribe.rs b/crates/yaatal-voice/src/transcribe.rs
+index 5949ac7..fb6cc5d 100644
+--- a/crates/yaatal-voice/src/transcribe.rs
++++ b/crates/yaatal-voice/src/transcribe.rs
+@@ -4,6 +4,12 @@ use thiserror::Error;
+ /// Default HuggingFace Whisper model for cloud transcription.
+ const DEFAULT_HF_MODEL: &str = "openai/whisper-large-v3";
+ 
++/// HuggingFace hosted inference. Overridable via `HF_INFERENCE_BASE_URL` so a
++/// test can point this path at a local mock — the only way to *prove* the
++/// caller's sovereignty gate kept audio home, rather than assume it from a
++/// status code.
++const DEFAULT_HF_BASE_URL: &str = "https://api-inference.huggingface.co";
++
+ /// Default transcription API timeout (30 seconds — African latency tolerant).
+ const TRANSCRIPTION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+ 
+@@ -101,7 +107,11 @@ impl TranscriptionRouter {
+             });
+         }
+ 
+-        let url = format!("https://api-inference.huggingface.co/models/{}", model);
++        let base_url = std::env::var("HF_INFERENCE_BASE_URL")
++            .ok()
++            .filter(|value| !value.trim().is_empty())
++            .unwrap_or_else(|| DEFAULT_HF_BASE_URL.to_string());
++        let url = format!("{}/models/{}", base_url.trim_end_matches('/'), model);
+ 
+         let client = reqwest::Client::builder()
+             .timeout(TRANSCRIPTION_TIMEOUT)
