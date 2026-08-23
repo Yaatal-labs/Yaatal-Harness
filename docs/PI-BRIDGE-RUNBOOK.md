@@ -6,14 +6,14 @@
 
 ---
 
-## Status (as of 2026-08-23, commit `7b9548b`)
+## Status (as of 2026-08-23, commit `8baf868`)
 
 | Piece | State |
 |---|---|
 | `crates/yaatal-pi-bridge` — Rust custody core | ✅ landed, 4 tests green |
 | Sovereignty via Engine gateway (Phase 3) | ✅ **decided**, not yet built |
-| Loop shape (manual drive, weighted verdicts) | ✅ **decided**, not yet built |
-| Node planner (`AgentHarness` w/ manifest-only tools) | ✅ landed, 4 guard tests green |
+| Loop shape — **`Agent` + `beforeToolCall`**, weighted | ✅ decided and running (Node side) |
+| Node planner (`Agent` w/ manifest-only tools) | ✅ landed, 19 Node tests green |
 | `ToolSpec.cost` + `AuditedExec` cost attribution | ✅ landed, cap trips |
 | Yaatal Pi provider (`Provider` → `/api/ai/chat`) | ✅ landed, 9 tests green |
 | JSON-RPC transport (stdin/stdout, bidirectional) | ❌ not started |
@@ -55,6 +55,10 @@ Then read, in order:
 
 ## Invariants — do not break these
 
+0. **Use `Agent`, never `AgentHarness`.** The harness at 0.84.1 (and 0.84.2)
+   is a scaffold — 22 methods throw `HarnessNotImplemented`, including
+   `prompt`, `peekAction`, `executeAction` and `hooks.on`. It constructs and
+   holds tools, so component tests pass against it; it cannot run a turn.
 1. **Depend on `@earendil-works/pi-agent-core`, never `pi-coding-agent`.** The
    coding agent auto-wires `bash`/`write`/`edit`/`read` and runs extensions with
    its own permissions. `pi-agent-core` ships **zero** tools; that is the entire
@@ -186,3 +190,19 @@ needs, not what you did.
   **Next: the bidirectional JSON-RPC transport (slice 4)** — Rust spawns the
   Node child, asks it to peek, decides, tells it to execute. That is the
   expensive slice and nothing above it is load-bearing until it exists.
+
+- **2026-08-23 (later) — the Node side actually runs.** Asked what was stopping
+  an end-to-end run here and found the answer was mostly nothing, plus one
+  wrong assumption: `AgentHarness` cannot execute a turn at this version. The
+  planner now targets `Agent`, the custody gate is `beforeToolCall`
+  (`{block, reason, terminate}`), and `loop.test.mjs` runs planner + provider +
+  a scripted Engine end to end — tool call synthesized from text, gated,
+  executed, second turn, `user -> assistant -> toolResult -> assistant`.
+  That test also caught a provider defect the unit tests structurally could
+  not: `Provider.auth.apiKey` needs `resolve()`, and only `Models.streamSimple`
+  exercises it. **Write the composition test early on the next slice.**
+  What is still blocked, and only by environment: a *real* model. No docker so
+  no Postgres so no Engine boot, and no AI keys, so the Engine would answer
+  `AllTiersExhausted` anyway. Everything above the Engine is exercised.
+  **Next: slice 4, the Rust<->Node transport** — and note the Rust side now
+  owns `beforeToolCall`, not a peek/execute drive loop.
