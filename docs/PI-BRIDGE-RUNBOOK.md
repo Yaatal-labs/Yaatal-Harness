@@ -19,7 +19,7 @@
 | JSON-RPC transport (stdin/stdout, bidirectional) | ❌ not started |
 | `yaatal-runner` wired as first caller | ❌ not started |
 | Audit `ModelCall` events (Phase 2) | ❌ not started |
-| Roles beyond `ops-runner` (Phase 4) | ❌ not started |
+| Roles beyond `ops-runner` (Phase 4) | ❌ not started — and `studio-live` is edge-turn's, not Pi's |
 | Container isolation (Phase 5) | ❌ not started |
 
 **The bridge has no caller.** It compiles and is tested, but nothing invokes it
@@ -111,9 +111,14 @@ provider (`Provider` → `/api/ai/chat`) → bidirectional JSON-RPC transport �
 ## Decisions already made — do not relitigate
 
 - **The cascade is text-only, and voice is a separate pipeline — by design.**
-  A voice-driven role (`studio-live`) cannot be built on `/api/ai/chat`. See
-  `VOICE-LANE-AUDIT.md`. `ops-runner` plans CLI invocations and is genuinely
-  text, so the bridge as built is right for it.
+  `studio-live` is **not** a Pi role; it belongs on `yaatal-edge-turn`. Read
+  `VOICE-AGENT-ARCHITECTURE.md` before touching anything voice-shaped — the
+  voice story spans four repos and a C++ submodule, and reading one alone gives
+  a wrong answer. `ops-runner` plans CLI invocations and is genuinely text, so
+  the bridge as built is right for it.
+- **Four things call a model:** the cascade, edge-turn's `ProposalBackend`,
+  Pi's `Provider`, and speech-core's `sc_llm_vtable_t`. The last is to be left
+  `NULL` — speech-core does ears, mouth and turn-taking, never the thinking.
 - **The planner routes through the Engine cascade, never a provider directly.**
   No provider credentials in the Harness; only `YAATAL_ENGINE_URL` +
   `YAATAL_TOKEN`, reusing `crates/yaatal-runner/src/proposals_push.rs:128`.

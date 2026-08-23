@@ -190,6 +190,21 @@ cost — declarative, Rust-side, no Engine change, and it makes weighting a
 property of a role, consistent with "roles are configuration."
 
 ### Phase 4 — Remaining roles
+
+**CORRECTED 2026-08-23 — `studio-live` is not a Pi role.** See
+`VOICE-AGENT-ARCHITECTURE.md`. It belongs on `yaatal-edge-turn`, whose closed
+`ToolName` enum and typed domain limits (`MAX_PRICE_FCFA`) are guarantees a Pi
+manifest entry cannot express — in a path that changes displayed prices. Its
+model lane is `LoopbackLocal`, structurally enforced (`MINIMIND_URL must target
+a loopback host`), not classifier-dependent. Wolof is exactly where a text
+classifier is weakest, so the structural guarantee is worth more than the
+dynamic one.
+
+A role therefore needs a fifth field beyond what this section claims:
+**actor + allowlist + prompt + model choice + model lane.** `merchant-agent` and
+`dev-agent` remain Pi roles on the `Cascade` lane.
+
+
 Add `studio-live`, `merchant-agent`, `dev-agent` as actor + allowlist + prompt
 entries. `studio-live` reuses `edge-turn`'s existing validation
 (`crates/yaatal-edge-turn/src/contract.rs`) rather than re-deriving limits.
