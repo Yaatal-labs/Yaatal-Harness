@@ -8,7 +8,7 @@ Pick up here. Everything below is verified, not assumed.
 |---|---|
 | Pi slices 1–3 | ✅ merged and pushed, four gates green |
 | Voice architecture + execution scope | ✅ `docs/VOICE-AGENT-ARCHITECTURE.md` |
-| **V1 + V2** (transcribe leak, safety signals) | ✅ **written and green — patch in this folder, NOT applied** |
+| **V1 + V2** (transcribe leak, safety signals) | ✅ **LANDED** — Engine `yaatal/voice-agent` @ `c7d07d0`, pushed |
 | V3 speech-core facade | ⏳ in flight when the session closed; Engine tree may be dirty |
 | Pi slice 4 transport | ❌ designed, no code |
 
