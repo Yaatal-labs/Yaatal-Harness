@@ -50,6 +50,28 @@ Also: on `Err(Denied)`, `execute` must **return** an `AgentToolResult` with `ter
 
 Protocol: NDJSON JSON-RPC 2.0, `plan` (Rust→Node), `gate` and `execute` (Node→Rust). Ids namespaced per direction (`r0…`/`n0…`) — unprefixed numeric ids collide legally across directions. Gate **fails closed** on timeout. A line >1 MiB without a newline is fatal, not skipped.
 
+## V3 speech-core facade — research banked, no code
+
+Two independent runs reached the same design. Beyond what
+`VOICE-AGENT-ARCHITECTURE.md` records:
+
+- **`push_audio` is internally mutex-protected on the C++ side.** The event
+  queue race is still real (Rust owner vs C++ worker thread), but the input
+  path is not. `Session` was left `!Send` as a deliberate scope-limiting
+  choice, not because it fixes the race — the `Mutex<VecDeque<Event>>` is what
+  fixes that.
+- **The `sys.rs` mock should become real callable no-op fns, not dangling
+  `extern` declarations.** Today's mock declares symbols that would fail at
+  link time, so `--no-default-features` never actually type-checks the real
+  facade — it compiles a separate ~80-line stub `Session`. Giving the mock real
+  no-op bodies matching bindgen's struct shapes collapses both feature paths
+  onto one `Session` impl and makes that gate mean something.
+- Order to build in: new `sys.rs` mock first (full vtable/config parity), then
+  `session.rs` (traits, `Shim`, trampolines, unified `Session`/`SessionBuilder`),
+  then `tests/speech_core_composition.rs`, then the six gates.
+- `Shim` needs `Mutex<CString>` slots for **three** call sites, not one:
+  `transcribe`, `push_chunk`, and `end_stream` each return text + language.
+
 ## Orchestration lessons — worth obeying
 
 - **Worktree isolation is broken in this environment.** The session's primary dir is not a git repo, so isolation anchors to whatever repo is nearest — three agents got worktrees of an unrelated cloned repo and could write nothing. Run agents **without** isolation, with disjoint write sets, and **forbid them from committing**; the orchestrator reviews and commits. That also removes git index contention between two agents in one repo.
