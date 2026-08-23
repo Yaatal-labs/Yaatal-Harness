@@ -117,12 +117,77 @@ Each lands independently and leaves the workspace compiling
   `yaatal-audit::proposals` generates `ConfigProposal`s over them unchanged.
 
 ### Phase 3 — Sovereignty via the Engine gateway
-- Intercept `before_provider_request`; route Pi's LLM calls to the Engine's
-  `/api/ai/chat` rather than letting `pi-ai` call providers directly.
-- This puts every planner turn through `route_declared` (one classifier), the
-  5-tier cascade, the circuit breakers and the shared token budget — the
-  `OnceLock` gateway in `crates/yaatal-api/src/controllers/ai.rs:50`.
-- Founder decision: gateway, not direct. Do not duplicate the classifier.
+
+**DECIDED AND CORRECTED 2026-08-23.** Pulled ahead of Phase 1's completion: a
+planner that calls a provider directly is not something to retrofit later, and
+doing it first costs nothing extra.
+
+**Founder call:** the planner must not pin a model. Whichever tier the cascade
+chooses should be able to run it.
+
+**The hook this section used to name does not exist.** `HookName` in
+`pi-agent-core@0.84.1` is `before_run | before_resume | before_run_end |
+transform_context | before_request | before_payload | after_response |
+before_tool | after_tool | before_compaction | before_navigation`. There is no
+`before_provider_request`, so the original instruction was unimplementable.
+
+**The seam is a custom `Provider`.** `Provider` is a plain interface in
+`pi-ai/dist/models.d.ts` (`id`, `name`, `baseUrl?`, `headers?`, `auth`,
+`getModels()`, `stream()`, `streamSimple()`), registered with `createModels()` +
+`setProvider(provider)` (`:157`, `:148`). `Api = KnownApi | (string & {})`
+(`pi-ai/dist/types.d.ts:16`) makes a custom API identifier an explicit
+extension point, not a workaround.
+
+**The cascade has no tool-calling surface, and that is fine.** `Message` is
+`{role, content}` (Engine `yaatal-core/src/ai/router.rs:85`), the provider body
+is `{model, messages, max_tokens, temperature}` (`:983`), and `/api/ai/chat`
+returns `{content, tier_used, model, request_id, capability}`. Native tool
+calling is model-dependent — requiring it would collapse the planner onto
+T2–T4 and break the cascade property we want. Text in, text out keeps every
+tier eligible, Tier 1 on-device included.
+
+Pi models tool calls as *content blocks* (`TextContent | ThinkingContent |
+ToolCall`, built by `fauxToolCall(name, args)`), so the Yaatal provider posts
+text to `/api/ai/chat`, parses the reply, and **synthesizes a native `ToolCall`
+block**. Pi's loop sees native tool calls; the cascade never learns about tools;
+the parse lives in exactly one place instead of scattered through the loop.
+
+Eventual fit: `yaatal-tool-router-granite-350m-v2` (slot-F1 0.969) is a
+purpose-trained text→tool-call model — the natural Tier-1 planner.
+
+Auth reuses `YAATAL_ENGINE_URL` + `YAATAL_TOKEN` + bearer, already in
+`crates/yaatal-runner/src/proposals_push.rs:128`. **No provider credentials in
+the Harness at all.** Use `Capability::Chat`; a `Capability::Plan` alias is a
+one-line Engine change, deferred.
+
+Every planner turn therefore goes through `route_declared` (one classifier),
+the 5-tier cascade, the circuit breakers and the shared token budget — the
+`OnceLock` gateway in the Engine's `crates/yaatal-api/src/controllers/ai.rs:50`.
+Do not duplicate the classifier.
+
+### Phase 3b — Loop shape: manual drive, weighted verdicts
+
+**Founder call: hybrid and weighted.** `drive: "manual"` on
+`AgentHarnessOptions`, with `peekAction()` / `executeAction()` on `AgentLane`,
+lets Rust hold the loop and see a planned action *before* the tool boundary —
+a third gate above the manifest and the policy check, and it comes free.
+
+The per-action decision is graded rather than a uniform round-trip, and this
+needs **no new policy machinery**. `PolicyVerdict` is already three-valued
+(`yaatal-audit/src/lib.rs:114`) and `ToolPolicyGate` already implements the
+grading (`yaatal-policy/src/tool_policy.rs`):
+
+| Verdict | Loop behaviour |
+|---|---|
+| `Allow` | `executeAction()` straight through — the fast path |
+| `AllowWithCap(remaining)` | execute, debit the run budget; exhaustion halts the loop |
+| `Deny(reason)` | refuse, audit, return a model-readable refusal |
+
+**Gap to close:** `AuditedExec::run` never calls `.cost(...)`
+(`crates/yaatal-tools/src/audited_exec.rs:93-145`), so the cap sums to zero and
+`AllowWithCap` can never trip. The weight goes on the manifest as a per-tool
+cost — declarative, Rust-side, no Engine change, and it makes weighting a
+property of a role, consistent with "roles are configuration."
 
 ### Phase 4 — Remaining roles
 Add `studio-live`, `merchant-agent`, `dev-agent` as actor + allowlist + prompt

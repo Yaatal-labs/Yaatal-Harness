@@ -6,16 +6,19 @@
 
 ---
 
-## Status (as of 2026-08-11, commit `e5b75bb`)
+## Status (as of 2026-08-23, commit `d684878`)
 
 | Piece | State |
 |---|---|
 | `crates/yaatal-pi-bridge` — Rust custody core | ✅ landed, 4 tests green |
+| Sovereignty via Engine gateway (Phase 3) | ✅ **decided**, not yet built |
+| Loop shape (manual drive, weighted verdicts) | ✅ **decided**, not yet built |
 | Node planner (`AgentHarness` w/ manifest-only tools) | ❌ not started |
-| JSON-RPC transport (stdin/stdout) | ❌ not started |
+| `ToolSpec.cost` + `AuditedExec` cost attribution | ❌ not started |
+| Yaatal Pi provider (`Provider` → `/api/ai/chat`) | ❌ not started |
+| JSON-RPC transport (stdin/stdout, bidirectional) | ❌ not started |
 | `yaatal-runner` wired as first caller | ❌ not started |
 | Audit `ModelCall` events (Phase 2) | ❌ not started |
-| Sovereignty via Engine gateway (Phase 3) | ❌ not started |
 | Roles beyond `ops-runner` (Phase 4) | ❌ not started |
 | Container isolation (Phase 5) | ❌ not started |
 
@@ -79,27 +82,44 @@ Smallest useful next slice. Nothing below needs the RPC transport yet.
    `"type": "module"` and an exact dep on
    `@earendil-works/pi-agent-core@0.84.1`.
 2. `planner.mjs`: read a manifest (JSON on stdin or argv for now), build an
-   `AgentHarness` passing `tools` built **only** from that manifest. Each tool's
-   `execute()` should, for this slice, just return a stub result — wiring it to
-   real RPC is the step after.
+   `AgentHarness` passing `tools` built **only** from that manifest, and
+   `drive: "manual"`. Each tool's `execute()` returns a stub result for this
+   slice — wiring it to real RPC is the step after.
    - `AgentHarnessOptions` needs `session`, `models`, `model`; `tools` is
      optional (that is the point). Types:
-     `node_modules/@earendil-works/pi-agent-core/dist/harness/agent-harness.d.ts`.
-   - Tool shape: `AgentHarnessTool` in `dist/harness/types.d.ts:57`.
+     `node_modules/@earendil-works/pi-agent-core/dist/harness/agent-harness.d.ts:319`.
+   - Tool shape: `HarnessTool = AgentTool & { replay?: "never" | "safe" }`.
 3. **Guard test** (this is the deliverable, not the planner): assert the
    entrypoint source contains none of the four factory names, and assert a
    harness built from an empty manifest exposes zero tools. Wire it into
    `npm test` in that folder, and reference it from the Rust crate's README so
    it is discoverable.
-4. Re-run the probe idea from `scratchpad/pi-spike/probe.mjs` (recreate if gone,
-   ~20 lines) as a version-drift check: if a future Pi makes `tools` non-optional
-   or auto-registers a built-in, that must fail loudly rather than silently
-   widen the agent's reach.
+4. A version-drift probe: if a future Pi makes `tools` non-optional or
+   auto-registers a built-in, that must fail loudly rather than silently widen
+   the agent's reach.
 
-After that, in order: JSON-RPC transport over stdin/stdout → `ToolIntent`
-round-trip → `yaatal-runner` calls `PiBridge::dispatch` → Phase 2 audit events.
+Then, in order: `ToolSpec.cost` + `AuditedExec` cost attribution → the Yaatal
+provider (`Provider` → `/api/ai/chat`) → bidirectional JSON-RPC transport →
+`yaatal-runner` calls the bridge → Phase 2 `ModelCall` audit events.
 
 ---
+
+## Decisions already made — do not relitigate
+
+- **The planner routes through the Engine cascade, never a provider directly.**
+  No provider credentials in the Harness; only `YAATAL_ENGINE_URL` +
+  `YAATAL_TOKEN`, reusing `crates/yaatal-runner/src/proposals_push.rs:128`.
+- **`before_provider_request` does not exist.** The seam is a **custom
+  `Provider`** registered with `createModels()` + `setProvider()`. See
+  `PI-RUNTIME-INTEGRATION.md` § Phase 3 for the verified type references.
+- **The cascade is text-only and stays that way.** The Yaatal provider
+  synthesizes native `ToolCall` content blocks from the text reply, so Pi's loop
+  sees native tool calls and the parse lives in one place.
+- **Loop shape is `drive: "manual"` with weighted verdicts.** `PolicyVerdict`
+  is already three-valued and `ToolPolicyGate` already grades; the only gap is
+  that nothing feeds `AuditEvent::cost`.
+- **Pin stays `0.84.1`.** 0.84.2 exists but every custody property above was
+  verified against 0.84.1. Bump deliberately, with the drift probe in place.
 
 ## Gotchas already paid for
 
@@ -143,3 +163,14 @@ needs, not what you did.
   `AuditedExec` rather than duplicating policy/store/actor/timeout — an earlier
   draft duplicated them and clippy correctly flagged four dead fields.
   Next: Node planner + guard test (above). The bridge has no caller yet.
+
+- **2026-08-23 — Phase 3 decided and corrected; loop shape decided.** Verified
+  the published `0.84.1` tarball rather than assuming: `tools?` is optional
+  (`agent-harness.d.ts:325`), `setTools` at `:444`, built-ins are separate
+  opt-in modules — the custody basis holds. Two errors found in the old plan:
+  `before_provider_request` is not a real hook, and the seam is a custom
+  `Provider`, not a hook at all. Also found `drive: "manual"` +
+  `peekAction()`/`executeAction()`, which the plan did not know about — that is
+  now the loop shape. Weighting needs no new types (`AllowWithCap` and the
+  per-run spend cap already exist and are tested); it needs `AuditedExec::run`
+  to attribute a cost, which it currently never does. Still no caller.

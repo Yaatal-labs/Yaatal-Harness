@@ -1,0 +1,16 @@
+{
+  "name": "@yaatal/pi-bridge-node",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Node side of the Yaatal Harness Pi bridge: a planner that can only propose.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "0.84.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
