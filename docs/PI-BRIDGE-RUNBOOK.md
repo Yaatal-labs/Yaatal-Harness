@@ -6,16 +6,16 @@
 
 ---
 
-## Status (as of 2026-08-23, commit `d684878`)
+## Status (as of 2026-08-23, commit `7b9548b`)
 
 | Piece | State |
 |---|---|
 | `crates/yaatal-pi-bridge` — Rust custody core | ✅ landed, 4 tests green |
 | Sovereignty via Engine gateway (Phase 3) | ✅ **decided**, not yet built |
 | Loop shape (manual drive, weighted verdicts) | ✅ **decided**, not yet built |
-| Node planner (`AgentHarness` w/ manifest-only tools) | ❌ not started |
-| `ToolSpec.cost` + `AuditedExec` cost attribution | ❌ not started |
-| Yaatal Pi provider (`Provider` → `/api/ai/chat`) | ❌ not started |
+| Node planner (`AgentHarness` w/ manifest-only tools) | ✅ landed, 4 guard tests green |
+| `ToolSpec.cost` + `AuditedExec` cost attribution | ✅ landed, cap trips |
+| Yaatal Pi provider (`Provider` → `/api/ai/chat`) | ✅ landed, 9 tests green |
 | JSON-RPC transport (stdin/stdout, bidirectional) | ❌ not started |
 | `yaatal-runner` wired as first caller | ❌ not started |
 | Audit `ModelCall` events (Phase 2) | ❌ not started |
@@ -174,3 +174,15 @@ needs, not what you did.
   now the loop shape. Weighting needs no new types (`AllowWithCap` and the
   per-run spend cap already exist and are tested); it needs `AuditedExec::run`
   to attribute a cost, which it currently never does. Still no caller.
+
+- **2026-08-23 — slices 1-3 landed; the bridge still has no caller.** Node
+  planner + custody guard, `ToolSpec.cost` wired so the spend cap finally
+  moves, and the Yaatal provider (Pi's only model is `cascade`; the Engine
+  picks the tier). `crates/yaatal-pi-bridge/README.md` now carries the verified
+  0.84.1 facts — read it before re-deriving anything about Pi's types. Four
+  pre-existing gate failures (fmt, and clippy in models/search/voice) were
+  cleared, so all four gates are green; note clippy fails fast per crate, so
+  use `--keep-going` to size lint debt rather than fixing one at a time.
+  **Next: the bidirectional JSON-RPC transport (slice 4)** — Rust spawns the
+  Node child, asks it to peek, decides, tells it to execute. That is the
+  expensive slice and nothing above it is load-bearing until it exists.
