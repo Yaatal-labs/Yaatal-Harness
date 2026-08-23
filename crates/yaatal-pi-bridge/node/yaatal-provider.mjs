@@ -219,9 +219,23 @@ export function yaatalProvider({
       id: YAATAL_PROVIDER_ID,
       name: "Yaatal Engine",
       baseUrl,
-      // Required by the interface. The Engine takes a Harness-minted bearer
-      // token, not a vendor key, so there is no interactive login to offer.
-      auth: { apiKey: { name: "Yaatal Engine bearer token" } },
+      /**
+       * `Models` resolves provider auth before every request, so `resolve` is
+       * required — a bare `{name}` throws "apiKey.resolve is not a function"
+       * at request time, not construction time. Ambient-only: the Engine takes
+       * a Harness-minted bearer token, not a vendor key, so there is no
+       * interactive `login` to offer. Returning `undefined` marks the provider
+       * unconfigured, which is the honest answer when no token is set.
+       */
+      auth: {
+        apiKey: {
+          name: "Yaatal Engine bearer token",
+          resolve: async () =>
+            token
+              ? { auth: { apiKey: token, baseUrl }, source: "YAATAL_TOKEN" }
+              : undefined,
+        },
+      },
       getModels: () => [model],
       stream,
       streamSimple: stream,

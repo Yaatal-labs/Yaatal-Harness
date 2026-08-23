@@ -18,7 +18,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import * as piAgentCore from "@earendil-works/pi-agent-core";
-import { AgentHarness, InMemorySessionStorage, Session } from "@earendil-works/pi-agent-core";
+import { Agent } from "@earendil-works/pi-agent-core";
 
 import { createPlanner, fauxModels } from "./planner.mjs";
 
@@ -35,9 +35,6 @@ const PI_NATIVE_TOOL_FACTORIES = [
 ];
 
 const PLANNER_PATH = fileURLToPath(new URL("./planner.mjs", import.meta.url));
-
-const freshSession = () =>
-  new Session(new InMemorySessionStorage({ id: `guard-${Date.now()}`, createdAt: Date.now() }));
 
 test("planner source imports no native tool factory", () => {
   // Read the source rather than importing and inspecting: an import that had
@@ -60,48 +57,56 @@ test("planner source imports no native tool factory", () => {
   }
 });
 
-test("an empty manifest yields a planner with zero tools", async () => {
-  const { harness } = await createPlanner({ manifest: [], session: freshSession() });
-  assert.deepEqual(await harness.getActiveTools(), []);
+test("an empty manifest yields a planner with zero tools", () => {
+  const { agent } = createPlanner({ manifest: [] });
+  assert.deepEqual(agent.state.tools, []);
 });
 
-test("a two-tool manifest yields exactly those two tools and nothing else", async () => {
+test("a two-tool manifest yields exactly those two tools and nothing else", () => {
   const manifest = [
     { name: "products_list", description: "List the merchant's products." },
     { name: "orders_show", description: "Show one order by id." },
   ];
-  const { harness } = await createPlanner({ manifest, session: freshSession() });
-
-  const active = await harness.getActiveTools();
-  assert.deepEqual([...active].sort(), ["orders_show", "products_list"]);
-});
-
-test("version drift: `tools` is still optional and yields zero tools when omitted", async () => {
-  // Built here rather than through createPlanner precisely because
-  // createPlanner always passes `tools`. This asserts the property the whole
-  // custody design rests on: a harness built with no `tools` key at all is
-  // legal, and starts empty.
-  const { models, model } = fauxModels();
-  const { harness } = await AgentHarness.create({
-    session: freshSession(),
-    models,
-    model,
-    drive: "manual",
-  });
+  const { agent } = createPlanner({ manifest });
 
   assert.deepEqual(
-    await harness.getActiveTools(),
-    [],
-    "Pi auto-registered a tool into a harness that asked for none",
+    agent.state.tools.map((t) => t.name).sort(),
+    ["orders_show", "products_list"],
   );
+});
 
-  // `getActiveTools()` reports `activeToolNames`, a list separate from the
-  // registered tool set — a built-in could be registered without being active.
-  // Reaching past the TS-private `tools` field is deliberate: if Pi renames or
-  // removes it this fails loudly, which is what a drift probe is for.
-  assert.ok(
-    Array.isArray(harness.tools),
-    "AgentHarness#tools is gone — re-verify the custody story before bumping the pin",
+test("version drift: an agent given no tools registers none", () => {
+  // Built here rather than through createPlanner precisely because
+  // createPlanner always passes `tools`. This asserts the property the whole
+  // custody design rests on: an agent built with no tools at all is legal and
+  // starts empty. If a future Pi auto-registers a built-in, this fails loudly
+  // rather than quietly handing the planner a shell.
+  const { models, model } = fauxModels();
+  const agent = new Agent({
+    streamFn: (m, ctx, o) => models.streamSimple(m, ctx, o),
+    initialState: { systemPrompt: "", model },
+  });
+
+  assert.deepEqual(agent.state.tools, [], "Pi registered a tool nobody asked for");
+});
+
+test("version drift: the runnable layer is Agent, not AgentHarness", () => {
+  // AgentHarness at 0.84.1 is a scaffold — prompt/peekAction/executeAction and
+  // hooks.on all throw HarnessNotImplemented, and 0.84.2 is identical. The
+  // planner therefore targets Agent. When a release finally implements the
+  // harness this fails, which is the signal to re-evaluate the layer choice
+  // deliberately rather than discover it by accident.
+  const harnessSource = readFileSync(
+    fileURLToPath(
+      new URL(
+        "./node_modules/@earendil-works/pi-agent-core/dist/harness/agent-harness.js",
+        import.meta.url,
+      ),
+    ),
+    "utf8",
   );
-  assert.equal(harness.tools.length, 0, "Pi registered a tool the manifest did not ask for");
+  assert.ok(
+    harnessSource.includes('unavailable("prompt")'),
+    "AgentHarness.prompt is implemented now — reconsider Agent vs AgentHarness",
+  );
 });
