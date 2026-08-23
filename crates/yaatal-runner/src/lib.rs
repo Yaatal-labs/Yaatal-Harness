@@ -69,9 +69,11 @@ pub struct Runbook {
     /// Per-step timeout; a step past this is killed and audited as a failure.
     pub timeout_secs: u64,
     /// Per-run spend cap enforced by the policy gate (and checked by the eval).
-    /// Omit/`null` for no cap. Note: `AuditedExec` records no per-invocation cost
-    /// today, so with CLI-only steps spend stays 0 — the cap is wired end-to-end for
-    /// when cost-bearing steps (model calls) arrive.
+    /// Omit/`null` for no cap. Note: the runner's steps call the unweighted
+    /// `AuditedExec::run`, which attributes no cost, so with CLI-only steps spend
+    /// stays 0 and the cap never trips here. `run_weighted` is what moves it — the
+    /// Pi bridge passes `ToolSpec::cost` through it, and a runner step would need a
+    /// declared weight of its own to do the same.
     #[serde(default)]
     pub spend_cap: Option<f64>,
     /// Eval threshold: the run fails if its p95 event latency exceeds this.
