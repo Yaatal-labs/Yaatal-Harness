@@ -116,6 +116,13 @@ pipeline. Never use it; only `handler`, so Rust owns execution.
 
 ## 3. Where the voice agent plugs in
 
+**Ownership, stated once:** every audio-handling component is Engine-side —
+LiveKit transport, the speech-core facade and submodule, voice routing, voice
+session, and the transcribe endpoint. Harness owns no audio at all: `edge-turn`
+takes a `Transcript`, already text. Studio owns only the consumer end. So
+V1-V6 are Engine changes, V7 is Studio + Harness, and V8 is cross-cutting.
+
+
 ```
                     ┌──────────── people ────────────┐
    buyer/seller ──► LiveKit room ──► audio ──┐
@@ -201,7 +208,10 @@ STT routes. Deletion over addition.
 
 ### V6 — LiveKit → speech-core *(Engine, medium)*
 Pipe room audio into a session. This is H5 and the last wire before a voice
-agent can sit in a call.
+agent can sit in a call. **Both ends are Engine-side** — `controllers/livekit.rs`
+and `yaatal-voice` are in the same crate tree — so this is one repo's change,
+not a cross-repo negotiation. Studio consumes the result; it does not own the
+wire.
 **Check:** audio published to a room produces `Final` transcripts server-side.
 
 ### V7 — `studio-live` on edge-turn *(Harness, small)*
