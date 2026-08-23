@@ -2,3 +2,7 @@ target/
 .env
 .env.*
 !.env.example
+
+# Transient agent worktrees created by the Claude Code harness.
+# Full repo checkouts — never commit these.
+.claude/worktrees/
