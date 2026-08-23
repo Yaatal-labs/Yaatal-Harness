@@ -110,6 +110,10 @@ provider (`Provider` → `/api/ai/chat`) → bidirectional JSON-RPC transport �
 
 ## Decisions already made — do not relitigate
 
+- **The cascade is text-only, and voice is a separate pipeline — by design.**
+  A voice-driven role (`studio-live`) cannot be built on `/api/ai/chat`. See
+  `VOICE-LANE-AUDIT.md`. `ops-runner` plans CLI invocations and is genuinely
+  text, so the bridge as built is right for it.
 - **The planner routes through the Engine cascade, never a provider directly.**
   No provider credentials in the Harness; only `YAATAL_ENGINE_URL` +
   `YAATAL_TOKEN`, reusing `crates/yaatal-runner/src/proposals_push.rs:128`.
