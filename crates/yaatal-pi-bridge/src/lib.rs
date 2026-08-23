@@ -31,7 +31,9 @@
 //! An agentic role is an actor id plus a manifest subset. `ToolPolicyGate`
 //! already supports per-actor allowlists (`with_actor_allowed`), so adding the
 //! Studio, merchant or dev role is a manifest entry and a policy line rather
-//! than another integration.
+//! than another integration. How much a role may spend is configuration too:
+//! [`ToolSpec::cost`] is the per-call weight the gate's spend cap sums, so
+//! metering a role is a number in its manifest, not a code path.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -69,7 +71,9 @@ pub struct ToolIntent {
 }
 
 /// One bridged tool: the manifest key the model sees, and the command it means.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+///
+/// `Eq` is not derived because [`ToolSpec::cost`] is an `f64`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ToolSpec {
     /// Program to execute. Not model-supplied.
     pub program: String,
@@ -79,6 +83,14 @@ pub struct ToolSpec {
     pub prefix_args: Vec<String>,
     /// One-line description handed to the planner as the tool's docstring.
     pub description: String,
+    /// What one call of this tool debits from the run's spend cap, if the role
+    /// meters it. The weight lives on the manifest rather than in the planner
+    /// so it is a property of the role — the same place the allowlist is, and
+    /// out of the model's reach. `None` (the default, so manifests written
+    /// before this field still deserialize) means unmetered: the cap sees
+    /// nothing and `AllowWithCap` never shrinks for this tool.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cost: Option<f64>,
 }
 
 /// The complete set of things any planner may propose. Generated once and used
@@ -189,9 +201,12 @@ impl PiBridge {
         intent: &ToolIntent,
     ) -> Result<ExecOutput, BridgeError> {
         let (program, args) = self.resolve(intent)?;
+        // Same key `resolve` just validated, so this cannot miss. Costing here
+        // rather than inside `resolve` keeps that a pure name-resolution gate.
+        let cost = self.manifest.get(&intent.tool).and_then(|spec| spec.cost);
         let argv: Vec<&str> = args.iter().map(String::as_str).collect();
         self.exec
-            .run(ctx, intent.run_id, &program, &argv)
+            .run_weighted(ctx, intent.run_id, &program, &argv, cost)
             .await
             .map_err(|e| match e {
                 ExecError::DeniedByPolicy(reason) => BridgeError::Denied(reason),
@@ -213,6 +228,7 @@ mod tests {
                 program: "yaatal".to_owned(),
                 prefix_args: vec!["products".to_owned(), "list".to_owned()],
                 description: "List products".to_owned(),
+                cost: None,
             },
         )
     }
@@ -289,6 +305,7 @@ mod tests {
                     program: "true".to_owned(),
                     prefix_args: vec![],
                     description: "does nothing".to_owned(),
+                    cost: None,
                 },
             ),
             Arc::new(AlwaysDeny),
@@ -319,6 +336,86 @@ mod tests {
             events[0].policy_verdicts
         );
         assert!(!events[0].success);
+    }
+
+    /// **The weighting property.** A manifest cost is what makes the spend cap
+    /// move: each dispatch debits its tool's weight, `AllowWithCap` reports a
+    /// shrinking remainder, and the loop halts on `Deny` once the budget is
+    /// gone. Before `ToolSpec::cost` existed the events carried no cost, the
+    /// sum stayed 0.0, and this sequence ran forever — so the assertion that
+    /// matters most is on the costs in the audit trail, not just the verdicts.
+    #[tokio::test]
+    async fn manifest_costs_accumulate_until_the_spend_cap_halts_the_loop() {
+        let store = Arc::new(yaatal_audit::MemoryAuditStore::default());
+        let bridge = PiBridge::new(
+            ToolManifest::new().with_tool(
+                "noop",
+                ToolSpec {
+                    program: "true".to_owned(),
+                    prefix_args: vec![],
+                    description: "does nothing".to_owned(),
+                    cost: Some(0.4),
+                },
+            ),
+            Arc::new(yaatal_policy::tool_policy::ToolPolicyGate::new(
+                ["true".to_owned()],
+                Some(1.0),
+                store.clone() as Arc<dyn AuditStore>,
+            )),
+            store.clone(),
+            "ops-runner",
+            Duration::from_secs(5),
+        );
+
+        let ctx = RequestContext::new("test");
+        let run_id = Uuid::new_v4();
+        let intent = ToolIntent {
+            actor: "ops-runner".to_owned(),
+            run_id,
+            tool: "noop".to_owned(),
+            args: vec![],
+        };
+
+        // 0.4 a call against a cap of 1.0: three run, the fourth is refused.
+        for call in 0..3 {
+            bridge
+                .dispatch(&ctx, &intent)
+                .await
+                .unwrap_or_else(|e| panic!("call {call} is under the cap, got {e:?}"));
+        }
+        let err = bridge
+            .dispatch(&ctx, &intent)
+            .await
+            .expect_err("the fourth call is over the cap");
+        assert!(matches!(err, BridgeError::Denied(_)), "got {err:?}");
+
+        let events = store.by_run(run_id).await.expect("audit readable");
+        assert_eq!(
+            events.len(),
+            4,
+            "every outcome is audited, refusal included"
+        );
+
+        // The remainder shrinks by exactly the manifest weight each time.
+        let remaining: Vec<f64> = events[..3]
+            .iter()
+            .map(|e| match e.policy_verdicts.as_slice() {
+                [PolicyVerdict::AllowWithCap(left)] => *left,
+                other => panic!("expected one AllowWithCap, got {other:?}"),
+            })
+            .collect();
+        for (got, want) in remaining.iter().zip([1.0, 0.6, 0.2]) {
+            assert!((got - want).abs() < 1e-9, "remaining {remaining:?}");
+        }
+
+        // …because the events actually carry the cost. This is the whole fix.
+        assert_eq!(
+            events.iter().map(|e| e.cost).collect::<Vec<_>>(),
+            vec![Some(0.4), Some(0.4), Some(0.4), None],
+            "three metered runs; a refusal spawns nothing so it spends nothing"
+        );
+        assert!(events[3].policy_verdicts.iter().any(PolicyVerdict::is_deny));
+        assert!(!events[3].success);
     }
 
     struct AlwaysDeny;

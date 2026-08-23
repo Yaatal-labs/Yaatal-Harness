@@ -85,17 +85,39 @@ impl AuditedExec {
         }
     }
 
-    /// Run `program` with `args`. Policy is checked first (tool name = `program`); a
-    /// deny returns [`ExecError::DeniedByPolicy`] *after* appending the deny
-    /// `AuditEvent`, and the process is never spawned. An allowed run appends its
-    /// `AuditEvent` (digests, latency, verdict) whether it exits cleanly, fails, or
-    /// times out.
+    /// Run `program` with `args`, attributing no cost — [`AuditedExec::run_weighted`]
+    /// with `None`. The custody sequence lives there and only there; this is the
+    /// default for callers whose steps carry no declared weight (the ops runner's
+    /// CLI steps), where the run's spend legitimately stays zero.
     pub async fn run(
         &self,
         ctx: &RequestContext,
         run_id: Uuid,
         program: &str,
         args: &[&str],
+    ) -> Result<ExecOutput, ExecError> {
+        self.run_weighted(ctx, run_id, program, args, None).await
+    }
+
+    /// Run `program` with `args`. Policy is checked first (tool name = `program`); a
+    /// deny returns [`ExecError::DeniedByPolicy`] *after* appending the deny
+    /// `AuditEvent`, and the process is never spawned. An allowed run appends its
+    /// `AuditEvent` (digests, latency, verdict) whether it exits cleanly, fails, or
+    /// times out.
+    ///
+    /// `cost` is what this invocation debits from the run's budget. It is the *only*
+    /// thing that makes `ToolPolicyGate`'s spend cap move: the gate sums
+    /// `AuditEvent::cost` across the run, so an invocation that attributes nothing
+    /// leaves `AllowWithCap` reporting a budget that never shrinks. The weight is the
+    /// caller's declaration (for the Pi bridge, `ToolSpec::cost` from the manifest),
+    /// never the model's.
+    pub async fn run_weighted(
+        &self,
+        ctx: &RequestContext,
+        run_id: Uuid,
+        program: &str,
+        args: &[&str],
+        cost: Option<f64>,
     ) -> Result<ExecOutput, ExecError> {
         let command_line = if args.is_empty() {
             program.to_string()
@@ -113,6 +135,15 @@ impl AuditedExec {
                 .await?;
             return Err(ExecError::DeniedByPolicy(reason));
         }
+
+        // Attributed only past the deny gate: a refusal spawns nothing, so it spends
+        // nothing. Costing denials would let a loop that is already over its cap keep
+        // inflating the very sum the cap is measured against.
+        let builder = if let Some(cost) = cost {
+            builder.cost(cost)
+        } else {
+            builder
+        };
 
         let started = Instant::now();
         let result = self.spawn_and_wait(program, args).await;
